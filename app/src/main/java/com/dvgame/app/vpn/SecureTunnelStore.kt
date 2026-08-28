@@ -13,7 +13,7 @@ import javax.crypto.spec.GCMParameterSpec
 
 internal data class StoredTunnel(val config: String, val packageName: String, val validUntilMs: Long)
 
-class SecureTunnelStore(context: Context) {
+internal class SecureTunnelStore(context: Context) {
     private val preferences = context.getSharedPreferences("secure_tunnel_v2", Context.MODE_PRIVATE)
     private val alias = "dv_game_tunnel_v2"
     private val aad = "DV-Game:StoredTunnel:v2".toByteArray(Charsets.UTF_8)
