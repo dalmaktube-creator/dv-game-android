@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun connectAndLaunch(profile: ServerProfile, game: InstalledGame, setMessage: (String) -> Unit) {
-        val action = {
+        val action: () -> Unit = {
             lifecycleScope.launch { runCatching { repository.connect(profile.config, game.packageName) }
                 .onSuccess {
                     val launch = packageManager.getLaunchIntentForPackage(game.packageName)
