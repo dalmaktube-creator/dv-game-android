@@ -23,7 +23,6 @@ jobs:
         with:
           gradle-version: "8.10.2"
       - name: Build debug APK
-        id: android-build
         shell: bash
         run: |
           set -o pipefail
@@ -35,9 +34,9 @@ jobs:
         shell: bash
         run: |
           {
-            echo '### Android build diagnostics'
+            echo '### Android compiler diagnostics'
             echo '```text'
-            tail -n 180 build.log
+            grep -nE '(^e: |error:|Unresolved reference|Compilation error|FAILURE:|What went wrong)' build.log | tail -n 120 || true
             echo '```'
           } > build-comment.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file build-comment.md
