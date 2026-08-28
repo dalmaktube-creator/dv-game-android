@@ -122,17 +122,14 @@ class MainActivity : ComponentActivity() {
     private fun connectAndLaunch(account: AccountInfo, profile: ServerProfile, game: InstalledGame, setMessage: (String) -> Unit) {
         val nowMs = System.currentTimeMillis()
         val blockReason = account.connectionBlockReason(nowMs)
-        if (blockReason != null) {
-            setMessage(blockReason)
-            return
-        }
+        if (blockReason != null) { setMessage(blockReason); return }
         val restoreValidUntilMs = account.localRestoreValidUntilMs(nowMs)
         val action: () -> Unit = {
             lifecycleScope.launch { runCatching { repository.connect(profile.config, game.packageName, restoreValidUntilMs) }
                 .onSuccess {
                     val launch = packageManager.getLaunchIntentForPackage(game.packageName)
                     if (launch == null) setMessage("اجرای بازی ممکن نیست") else {
-                        setMessage("متصل؛ آمار تونل پس از بازگشت نمایش داده می‌شود")
+                        setMessage("متصل؛ موتور سازگار UDP فعال است")
                         startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }
                 }.onFailure { setMessage(it.message ?: "اتصال ناموفق بود") } }
@@ -151,10 +148,9 @@ private fun StatusCard(status: TunnelStatus, telemetry: TunnelTelemetry, message
                     is TunnelStatus.Up -> "متصل"; is TunnelStatus.Error -> "خطای اتصال" }, fontWeight = FontWeight.Bold)
                 Text(message, style = MaterialTheme.typography.bodySmall)
                 if (status is TunnelStatus.Up) {
-                    val handshake = if (telemetry.latestHandshakeEpochMillis > 0) "Handshake برقرار" else "در انتظار Handshake"
-                    Text("$handshake · ↓ ${formatBytes(telemetry.rxBytes)} · ↑ ${formatBytes(telemetry.txBytes)}",
+                    Text("↓ ${formatBytes(telemetry.rxBytes)} · ↑ ${formatBytes(telemetry.txBytes)}",
                         style = MaterialTheme.typography.labelSmall)
-                    Text("DNS و MTU پنل بدون تغییر · ${telemetry.routedPackages} پکیج مجاز",
+                    Text("${telemetry.engineName} · DNS پنل · ${telemetry.routedPackages} پکیج مجاز",
                         style = MaterialTheme.typography.labelSmall)
                 }
             }

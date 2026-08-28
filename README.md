@@ -1,46 +1,36 @@
 # DV Game Android
 
-Android WireGuard client for **per-game split tunneling**. The user imports a subscription link, selects installed games, and only those Android packages enter the WireGuard tunnel.
+Android game-only VPN client controlled by WG Gaming Panel.
 
-## MVP scope
+## Alpha 5 data path
 
-- Kotlin + Jetpack Compose
-- Detect launchable apps classified by Android as `CATEGORY_GAME`
-- Import a raw, JSON-wrapped, or Base64 WireGuard config from a subscription URL
-- Inject `IncludedApplications` into the WireGuard interface configuration
-- Connect with the official embeddable WireGuard Android tunnel library
-- Game Split mode: non-selected apps use the phone's normal network
-- Game Lock guidance: opens Android VPN settings for Always-on/Lockdown
-- Does not persist the subscription response or private key
+Alpha 5 keeps the panel WireGuard peer, keys, endpoint, AllowedIPs, MTU and DNS, but adds an opt-in-compatible game data path based on the successful Redmi Note 14 trace:
+
+```text
+game UID -> Android VpnService -> hev-socks5-tunnel -> Xray WireGuard outbound -> existing panel peer
+```
+
+Only the selected game and installed Google identity/game-save packages are admitted to the Android TUN. DV Game itself is not admitted, so the Xray/WireGuard transport socket uses the underlying network and cannot loop into the VPN. Other apps, including browsers, remain direct.
+
+The original official WireGuard Android tunnel dependency remains pinned in the application for config validation and compatibility. Alpha 5's UDP compatibility engine is used for the game path because the official `wireguard-go` TUN path reproduced multi-minute loading and lobby drops whenever Android per-app routing was enabled on the test device.
+
+## Security and DNS
+
+- Subscription fetch remains HTTPS-only with bounded responses and redirect validation.
+- WireGuard configurations are validated by the official parser before use.
+- The private key is retained only in memory and in the existing AES-GCM/Android-Keystore short restore lease.
+- Panel DNS addresses are carried through the WireGuard outbound; no public DNS is injected.
+- Exactly one panel peer is accepted by the compatibility engine.
+- Android application allowlisting remains fail-closed.
+- Xray and HEV binary inputs are pinned by release and SHA-256 in CI.
+- Alpha 5 is arm64-v8a only.
 
 ## Build
 
-Requirements: JDK 17, Android SDK 35, Gradle 8.10.2.
+CI fetches the pinned `AndroidLibXrayLite v26.8.20` AAR and the pinned HEV native library before building. The SHA-256 checks in `.github/workflows/android.yml` are mandatory.
 
 ```bash
-gradle :app:assembleDebug
+gradle :app:testDebugUnitTest :app:assembleDebug
 ```
 
-APK output:
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-## Important behavior
-
-Android implements package-level routing through `VpnService.Builder.addAllowedApplication()`. The WireGuard tunnel library maps the `IncludedApplications` interface field to that API. This means IP, domain, CDN, port, and region lists are not required for the base product.
-
-Game Lock still requires the user to enable **Always-on VPN** and **Block connections without VPN** in Android settings. Device-vendor behavior must be tested before presenting this as a guaranteed kill switch.
-
-## Next milestones
-
-1. Match the exact WG Gaming Panel subscription response schema.
-2. Add QR import and multiple exits.
-3. Add app icons, search, favorites, ping and location selection.
-4. Add signed release builds and private-key storage backed by Android Keystore.
-5. Add device tests for split routing and lockdown behavior.
-
-## Security note
-
-Cleartext HTTP is temporarily enabled because existing panel installations may expose local HTTP subscription URLs. Production deployments should use HTTPS; a later milestone will make cleartext an explicit per-profile opt-in.
+This is an alpha build and must be validated on the target device before production use.
