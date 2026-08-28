@@ -4,6 +4,8 @@ import com.wireguard.config.Config
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
+import java.net.Inet4Address
+import java.net.InetAddress
 
 internal data class WireGuardCompatConfig(
     val privateKey: String,
@@ -88,9 +90,22 @@ private fun splitEndpoint(value: String): Pair<String, Int> {
     return value.substring(0, split) to value.substring(split + 1).toInt()
 }
 
+private fun resolveEndpointBeforeTunnel(host: String): String {
+    if (isIpv4Literal(host)) return host
+    return InetAddress.getAllByName(host)
+        .firstOrNull { it is Inet4Address }
+        ?.hostAddress
+        ?: error("آدرس IPv4 سرور اتصال پیدا نشد: $host")
+}
+
 internal fun buildLibboxWireGuardConfig(config: WireGuardCompatConfig, packageName: String): String {
-    val (server, port) = splitEndpoint(config.endpoint)
+    val (endpointHost, port) = splitEndpoint(config.endpoint)
     require(port in 1..65535) { "پورت Endpoint نامعتبر است" }
+    // Resolve the peer hostname before CommandServer/TUN starts. Otherwise the
+    // endpoint lookup is routed through wg-game itself and deadlocks because
+    // WireGuard is not ready until that lookup succeeds.
+    val server = resolveEndpointBeforeTunnel(endpointHost)
+
     val peer = JSONObject()
         .put("address", server)
         .put("port", port)
