@@ -4,11 +4,17 @@ import android.content.Context
 import android.os.ParcelFileDescriptor
 import java.io.File
 
-/** Thin, auditable JNI bridge for the pinned hev-socks5-tunnel binary. */
+/** Thin JNI bridge matching the pinned v2rayNG 2.2.6 HEV binary exactly. */
 class TProxyService(private val context: Context, private val tun: ParcelFileDescriptor) {
     companion object {
-        @JvmStatic private external fun TProxyStartService(configPath: String, fd: Int): Boolean
-        @JvmStatic private external fun TProxyStopService(): Boolean
+        @JvmStatic
+        @Suppress("FunctionName")
+        private external fun TProxyStartService(configPath: String, fd: Int)
+
+        @JvmStatic
+        @Suppress("FunctionName")
+        private external fun TProxyStopService()
+
         init { System.loadLibrary("hev-socks5-tunnel") }
     }
 
@@ -29,7 +35,7 @@ class TProxyService(private val context: Context, private val tun: ParcelFileDes
               log-level: warn
             """.trimIndent()
         )
-        check(TProxyStartService(file.absolutePath, tun.fd)) { "راه‌اندازی UDP compatibility ناموفق بود" }
+        TProxyStartService(file.absolutePath, tun.fd)
     }
 
     fun stop() { runCatching { TProxyStopService() } }
