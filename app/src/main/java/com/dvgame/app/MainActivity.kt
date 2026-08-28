@@ -118,13 +118,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun connectAndLaunch(account: AccountInfo, profile: ServerProfile, game: InstalledGame, setMessage: (String) -> Unit) {
-        val blockReason = account.connectionBlockReason()
+        val nowMs = System.currentTimeMillis()
+        val blockReason = account.connectionBlockReason(nowMs)
         if (blockReason != null) {
             setMessage(blockReason)
             return
         }
+        val restoreValidUntilMs = account.localRestoreValidUntilMs(nowMs)
         val action: () -> Unit = {
-            lifecycleScope.launch { runCatching { repository.connect(profile.config, game.packageName) }
+            lifecycleScope.launch { runCatching { repository.connect(profile.config, game.packageName, restoreValidUntilMs) }
                 .onSuccess {
                     val launch = packageManager.getLaunchIntentForPackage(game.packageName)
                     if (launch == null) setMessage("اجرای بازی ممکن نیست") else {

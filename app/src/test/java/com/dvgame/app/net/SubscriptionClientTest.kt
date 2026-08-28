@@ -33,4 +33,9 @@ class SubscriptionClientTest {
         assertNotNull(AccountInfo("x", "active", 100, 100, null).connectionBlockReason(1000))
         assertNull(AccountInfo("x", "active", 50, 100, 2000).connectionBlockReason(1000))
     }
+
+    @Test fun localRestoreLeaseIsShortAndNeverExceedsExpiry() {
+        assertEquals(901_000L, AccountInfo("x", "active", 0, 100, null).localRestoreValidUntilMs(1_000))
+        assertEquals(500_000L, AccountInfo("x", "active", 0, 100, 500_000).localRestoreValidUntilMs(1_000))
+    }
 }

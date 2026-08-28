@@ -47,7 +47,8 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
 
     init { GoBackend.setAlwaysOnCallback { scope.launch { restoreForAlwaysOn() } } }
 
-    suspend fun connect(rawConfig: String, approvedPackage: String) = mutex.withLock {
+    suspend fun connect(rawConfig: String, approvedPackage: String, restoreValidUntilMs: Long) = mutex.withLock {
+        require(restoreValidUntilMs > System.currentTimeMillis()) { "اعتبار محلی اتصال پایان یافته است" }
         require(isInstalled(approvedPackage)) { "بازی تأییدشده روی گوشی نصب نیست" }
         mutableStatus.value = TunnelStatus.Connecting
         activePackage = approvedPackage
@@ -55,7 +56,7 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
             val scoped = scopeConfigToPackage(rawConfig, approvedPackage)
             val parsed = Config.parse(ByteArrayInputStream(scoped.toByteArray(Charsets.UTF_8)))
             withContext(Dispatchers.IO) { backend.setState(tunnel, Tunnel.State.UP, parsed) }
-            secureStore.save(rawConfig, approvedPackage)
+            secureStore.save(rawConfig, approvedPackage, restoreValidUntilMs)
             mutableStatus.value = TunnelStatus.Up(approvedPackage)
         } catch (error: Throwable) {
             activePackage = null
@@ -73,7 +74,8 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
 
     suspend fun restoreForAlwaysOn() {
         val saved = secureStore.load() ?: return
-        runCatching { connect(saved.first, saved.second) }
+        runCatching { connect(saved.config, saved.packageName, saved.validUntilMs) }
+            .onFailure { secureStore.clear() }
     }
 
     private fun isInstalled(packageName: String): Boolean {

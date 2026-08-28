@@ -12,6 +12,15 @@ data class AccountInfo(val name: String, val state: String, val usedBytes: Long,
             else -> null
         }
     }
+
+    fun localRestoreValidUntilMs(nowMs: Long = System.currentTimeMillis()): Long {
+        val shortLeaseEnd = nowMs + LOCAL_RESTORE_LEASE_MS
+        return expiryMs?.let { minOf(it, shortLeaseEnd) } ?: shortLeaseEnd
+    }
+
+    private companion object {
+        const val LOCAL_RESTORE_LEASE_MS = 15 * 60 * 1000L
+    }
 }
 
 data class DvSubscription(
