@@ -18,8 +18,18 @@ import java.io.ByteArrayInputStream
 
 private val PACKAGE_NAME_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
 
-internal fun scopeConfigToPackage(raw: String, packageName: String): String {
-    require(PACKAGE_NAME_PATTERN.matches(packageName)) { "نام پکیج بازی نامعتبر است" }
+/* Common game-side services used by Mobile Legends and Supercell titles.
+ * Play Store and Download Manager are deliberately excluded so app updates and
+ * arbitrary downloads can never consume the gaming tunnel. */
+private val ESSENTIAL_GAME_SERVICES = listOf(
+    "com.google.android.gms",
+    "com.google.android.gsf",
+    "com.google.android.play.games",
+)
+
+internal fun scopeConfigToPackages(raw: String, packageNames: Set<String>): String {
+    require(packageNames.isNotEmpty() && packageNames.size <= 8) { "فهرست سرویس‌های بازی نامعتبر است" }
+    require(packageNames.all(PACKAGE_NAME_PATTERN::matches)) { "نام پکیج بازی نامعتبر است" }
     val clean = raw.lineSequence().filterNot {
         val value = it.trimStart()
         value.startsWith("IncludedApplications", true) || value.startsWith("ExcludedApplications", true)
@@ -27,9 +37,13 @@ internal fun scopeConfigToPackage(raw: String, packageName: String): String {
     val interfaceIndexes = clean.indices.filter { clean[it].trim().equals("[Interface]", true) }
     require(interfaceIndexes.size == 1) { "ساختار Interface کانفیگ نامعتبر است" }
     require(clean.count { it.trim().equals("[Peer]", true) } >= 1) { "بخش Peer در کانفیگ پیدا نشد" }
-    clean.add(interfaceIndexes.single() + 1, "IncludedApplications = $packageName")
+    clean.add(interfaceIndexes.single() + 1,
+        "IncludedApplications = ${packageNames.sorted().joinToString(", ")}")
     return clean.joinToString("\n")
 }
+
+internal fun scopeConfigToPackage(raw: String, packageName: String): String =
+    scopeConfigToPackages(raw, setOf(packageName))
 
 class TunnelRepository(private val context: Context, private val scope: CoroutineScope) {
     private val backend = GoBackend(context)
@@ -53,7 +67,11 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
         mutableStatus.value = TunnelStatus.Connecting
         activePackage = approvedPackage
         try {
-            val scoped = scopeConfigToPackage(rawConfig, approvedPackage)
+            val routedPackages = buildSet {
+                add(approvedPackage)
+                ESSENTIAL_GAME_SERVICES.filterTo(this) { isInstalled(it) }
+            }
+            val scoped = scopeConfigToPackages(rawConfig, routedPackages)
             val parsed = Config.parse(ByteArrayInputStream(scoped.toByteArray(Charsets.UTF_8)))
             withContext(Dispatchers.IO) { backend.setState(tunnel, Tunnel.State.UP, parsed) }
             secureStore.save(rawConfig, approvedPackage, restoreValidUntilMs)
