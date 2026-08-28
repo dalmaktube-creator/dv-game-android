@@ -12,12 +12,15 @@ android {
         applicationId = "com.dvgame.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.2.0-alpha05.1"
+        versionCode = 8
+        versionName = "0.2.0-alpha06"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -47,7 +50,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.wireguard.android:tunnel:1.0.20260102")
-    implementation(files("libs/libv2ray.aar"))
+    implementation(files("libs/libbox.aar"))
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

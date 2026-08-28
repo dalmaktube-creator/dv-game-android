@@ -2,9 +2,13 @@ name: android
 
 on:
   push:
-    branches: [main, feat/app-v1, agent/alpha5-jni-crash-hotfix]
+    branches: [main, feat/app-v1, feat/libbox-game-engine]
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -19,53 +23,61 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.12"
+          cache: false
+      - name: Setup Android NDK r28
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
-      - name: Fetch pinned UDP compatibility dependencies
+      - name: Build minimal pinned sing-box libbox for arm64
         shell: bash
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: |
-          set -euo pipefail
-          mkdir -p app/libs app/src/main/jniLibs/arm64-v8a /tmp/dv-hev
-          curl -fL --retry 4 -o app/libs/libv2ray.aar \
-            https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.8.20/libv2ray.aar
-          echo "670cf11d9d10a6bb6548ac4f593acfa4339155732f6f8de4d45923f30a74deed  app/libs/libv2ray.aar" | sha256sum -c -
-          curl -fL --retry 4 -o /tmp/v2rayng.apk \
-            https://github.com/2dust/v2rayNG/releases/download/2.2.6/v2rayNG_2.2.6_arm64-v8a.apk
-          echo "62b0675c0986a8613f1bb67f1a68c366c6357e04a68687a3bd907170594c437d  /tmp/v2rayng.apk" | sha256sum -c -
-          unzip -q /tmp/v2rayng.apk 'lib/arm64-v8a/libhev-socks5-tunnel.so' -d /tmp/dv-hev
-          cp /tmp/dv-hev/lib/arm64-v8a/libhev-socks5-tunnel.so app/src/main/jniLibs/arm64-v8a/
-      - name: Verify HEV JNI declaration matches pinned binary contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q 'external fun TProxyStartService(configPath: String, fd: Int)$' app/src/main/java/com/v2ray/ang/service/TProxyService.kt
-          ! grep -q 'TProxyStartService(configPath: String, fd: Int): Boolean' app/src/main/java/com/v2ray/ang/service/TProxyService.kt
-      - name: Test and build debug APK
+          set -o pipefail
+          {
+            set -euo pipefail
+            git clone --depth 1 --branch v1.13.19 https://github.com/SagerNet/sing-box.git /tmp/sing-box
+            cd /tmp/sing-box
+            python3 - <<'PY'
+          from pathlib import Path
+          path = Path('cmd/internal/build_libbox/main.go')
+          text = path.read_text()
+          start = 'sharedTags = append(sharedTags, "with_gvisor", "with_quic", "with_wireguard", "with_utls", "with_naive_outbound", "with_clash_api", "badlinkname", "tfogo_checklinkname0")'
+          lean = 'sharedTags = append(sharedTags, "with_gvisor", "with_wireguard", "badlinkname", "tfogo_checklinkname0")'
+          tailscale = 'sharedTags = append(sharedTags, "with_tailscale", "ts_omit_logtail", "ts_omit_ssh", "ts_omit_drive", "ts_omit_taildrop", "ts_omit_webclient", "ts_omit_doctor", "ts_omit_capture", "ts_omit_kube", "ts_omit_aws", "ts_omit_synology", "ts_omit_bird")'
+          if start not in text or tailscale not in text:
+              raise SystemExit('pinned libbox build script changed unexpectedly')
+          path.write_text(text.replace(start, lean).replace(tailscale, '// DV Game lean build: Tailscale omitted'))
+          PY
+            make lib_install
+            export PATH="$PATH:$(go env GOPATH)/bin"
+            go run ./cmd/internal/build_libbox -target android -platform android/arm64
+            mkdir -p "$GITHUB_WORKSPACE/app/libs"
+            cp libbox.aar "$GITHUB_WORKSPACE/app/libs/libbox.aar"
+            sha256sum "$GITHUB_WORKSPACE/app/libs/libbox.aar" | tee "$GITHUB_WORKSPACE/libbox.sha256"
+          } 2>&1 | tee "$GITHUB_WORKSPACE/libbox-build.log"
+      - name: Test and build Alpha 6 debug APK
         shell: bash
         run: |
           set -o pipefail
           gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
-          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha05.1-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha06-debug.apk
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: dv-game-alpha05.1-debug-apk
-          path: DV-Game-0.2.0-alpha05.1-debug.apk
+          name: dv-game-alpha06-debug-apk
+          path: |
+            DV-Game-0.2.0-alpha06-debug.apk
+            libbox.sha256
           if-no-files-found: error
-          retention-days: 7
-      - name: Publish alpha hotfix release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          gh release create v0.2.0-alpha.5.1 \
-            DV-Game-0.2.0-alpha05.1-debug.apk \
-            --target "$GITHUB_SHA" \
-            --title "DV Game 0.2.0 Alpha 5.1" \
-            --prerelease \
-            --notes "Hotfix کرش هنگام زدن دکمه بازی: امضای JNI موتور HEV اکنون دقیقاً با باینری pinned v2rayNG 2.2.6 یکسان است (توابع native از نوع void/Unit هستند، نه Boolean). شرط خواندن مقدار بازگشتی نامعتبر که می‌توانست اجرای native را متوقف یا process را ناپایدار کند حذف شد. مسیر HEV + Xray WireGuard، DNS پنل، Peer، کلیدها و Per-App allowlist تغییری نکرده‌اند. لینک اشتراک موفق نیز روی دستگاه نگه داشته می‌شود."
+          retention-days: 14
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:
@@ -73,9 +85,10 @@ jobs:
         shell: bash
         run: |
           {
-            echo '### Android compiler diagnostics'
+            echo '### Android build diagnostics'
             echo '```text'
-            grep -nE '(^e: |error:|Unresolved reference|Compilation error|FAILED|FAILURE:|What went wrong|AssertionError)' build.log | tail -n 200 || true
+            tail -n 160 libbox-build.log 2>/dev/null || true
+            grep -nE '(^e: |error:|Unresolved reference|Compilation error|FAILED|FAILURE:|What went wrong|AssertionError)' build.log 2>/dev/null | tail -n 200 || true
             echo '```'
           } > build-comment.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file build-comment.md
