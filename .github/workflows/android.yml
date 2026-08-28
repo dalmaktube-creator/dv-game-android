@@ -23,78 +23,60 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25.12"
-          cache: false
-      - name: Setup Android NDK r28
-        id: ndk
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r28
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
-      - name: Build minimal pinned sing-box libbox for arm64
+
+      - name: Download pinned full libbox with Clash API
         shell: bash
-        env:
-          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: |
-          set -o pipefail
-          {
-            set -euo pipefail
-            git clone --depth 1 --branch v1.13.19 https://github.com/SagerNet/sing-box.git /tmp/sing-box
-            cd /tmp/sing-box
-            python3 - <<'PY'
-          from pathlib import Path
-          path = Path('cmd/internal/build_libbox/main.go')
-          text = path.read_text()
-          start = 'sharedTags = append(sharedTags, "with_gvisor", "with_quic", "with_wireguard", "with_utls", "with_naive_outbound", "with_clash_api", "badlinkname", "tfogo_checklinkname0")'
-          lean = 'sharedTags = append(sharedTags, "with_gvisor", "with_wireguard", "badlinkname", "tfogo_checklinkname0")'
-          tailscale = 'sharedTags = append(sharedTags, "with_tailscale", "ts_omit_logtail", "ts_omit_ssh", "ts_omit_drive", "ts_omit_taildrop", "ts_omit_webclient", "ts_omit_doctor", "ts_omit_capture", "ts_omit_kube", "ts_omit_aws", "ts_omit_synology", "ts_omit_bird")'
-          if start not in text or tailscale not in text:
-              raise SystemExit('pinned libbox build script changed unexpectedly')
-          path.write_text(text.replace(start, lean).replace(tailscale, '// DV Game lean build: Tailscale omitted'))
-          PY
-            make lib_install
-            export PATH="$PATH:$(go env GOPATH)/bin"
-            go run ./cmd/internal/build_libbox -target android -platform android/arm64
-            mkdir -p "$GITHUB_WORKSPACE/app/libs"
-            cp libbox.aar "$GITHUB_WORKSPACE/app/libs/libbox.aar"
-            sha256sum "$GITHUB_WORKSPACE/app/libs/libbox.aar" | tee "$GITHUB_WORKSPACE/libbox.sha256"
-          } 2>&1 | tee "$GITHUB_WORKSPACE/libbox-build.log"
-      - name: Test and build Alpha 6 debug APK
+          set -euo pipefail
+          mkdir -p app/libs /tmp/libbox
+          curl -fL --retry 3 \
+            -o /tmp/libbox.zip \
+            https://github.com/proother/sing-box-lib/releases/download/v1.13.19/libbox-android.aar.zip
+          echo "493bed8217b7c25d5699f964a7fcedd0d4d2d79abc72e4070a89709833b74f57  /tmp/libbox.zip" | sha256sum -c -
+          unzip -q /tmp/libbox.zip -d /tmp/libbox
+          AAR="$(find /tmp/libbox -name 'libbox.aar' -print -quit)"
+          test -n "$AAR"
+          cp "$AAR" app/libs/libbox.aar
+          sha256sum app/libs/libbox.aar | tee libbox.sha256
+
+      - name: Test and build Alpha 7 debug APK
         shell: bash
         run: |
           set -o pipefail
           gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
-          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha06-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha07-debug.apk
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: dv-game-alpha06-debug-apk
+          name: dv-game-alpha07-debug-apk
           path: |
-            DV-Game-0.2.0-alpha06-debug.apk
+            DV-Game-0.2.0-alpha07-debug.apk
             libbox.sha256
           if-no-files-found: error
           retention-days: 14
-      - name: Publish Alpha 6 release
+
+      - name: Publish Alpha 7 release
         if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view v0.2.0-alpha.6 >/dev/null 2>&1; then
-            gh release upload v0.2.0-alpha.6 DV-Game-0.2.0-alpha06-debug.apk libbox.sha256 --clobber
+          if gh release view v0.2.0-alpha.7 >/dev/null 2>&1; then
+            gh release upload v0.2.0-alpha.7 DV-Game-0.2.0-alpha07-debug.apk libbox.sha256 --clobber
           else
-            gh release create v0.2.0-alpha.6 \
-              DV-Game-0.2.0-alpha06-debug.apk libbox.sha256 \
+            gh release create v0.2.0-alpha.7 \
+              DV-Game-0.2.0-alpha07-debug.apk libbox.sha256 \
               --target "$GITHUB_SHA" \
-              --title "DV Game 0.2.0 Alpha 6" \
+              --title "DV Game 0.2.0 Alpha 7" \
               --prerelease \
-              --notes "نسخه آزمایشی هسته جدید: sing-box/libbox v1.13.19 با sing-tun mixed stack (System TCP + gVisor UDP) و WireGuard endpoint متصل به همان کلاینت، لوکیشن و تونل‌های فعلی پنل. مسیر HEV/Xray حذف شده است. پنل، کاربران فعلی و روش WireGuard رسمی تغییری نکرده‌اند. مخصوص تست Redmi Note 14 / Android 14 با Mobile Legends و لوکیشن‌های موجود."
+              --notes "رفع خطای clash api: این نسخه از libbox کامل v1.13.19 با تگ with_clash_api استفاده می‌کند. هسته sing-tun mixed stack و WireGuard outbound حفظ شده‌اند. بازی‌های مجاز همچنان فقط از پنل تعیین می‌شوند."
           fi
+
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:
@@ -104,7 +86,6 @@ jobs:
           {
             echo '### Android build diagnostics'
             echo '```text'
-            tail -n 160 libbox-build.log 2>/dev/null || true
             grep -nE '(^e: |error:|Unresolved reference|Compilation error|FAILED|FAILURE:|What went wrong|AssertionError)' build.log 2>/dev/null | tail -n 200 || true
             echo '```'
           } > build-comment.md

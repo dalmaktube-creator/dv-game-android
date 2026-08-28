@@ -12,8 +12,8 @@ android {
         applicationId = "com.dvgame.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.2.0-alpha06"
+        versionCode = 9
+        versionName = "0.2.0-alpha07"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
     }
