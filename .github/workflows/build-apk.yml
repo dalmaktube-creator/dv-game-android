@@ -1,0 +1,110 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches: [agent/singbox-rebuild, main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.12'
+
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager "platforms;android-35" "build-tools;35.0.0" >/dev/null 2>&1 || true
+
+      - name: Download and verify libbox AAR
+        run: |
+          mkdir -p app/libs /tmp/libbox-extract
+          wget -q "https://github.com/proother/sing-box-lib/releases/download/v1.13.19/libbox-android.aar.zip"
+          echo "493bed8217b7c25d5699f964a7fcedd0d4d2d79abc72e4070a89709833b74f57  libbox-android.aar.zip" | sha256sum -c -
+          unzip -o libbox-android.aar.zip -d /tmp/libbox-extract/
+          AAR="$(find /tmp/libbox-extract -name '*.aar' -print -quit)"
+          test -n "$AAR"
+          cp "$AAR" app/libs/libbox.aar
+          test -s app/libs/libbox.aar
+
+      - name: Build debug APK
+        id: build
+        shell: bash
+        run: |
+          set +e
+          gradle assembleDebug --no-daemon -x lint --stacktrace 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dv-game-build-log-${{ github.run_number }}
+          path: build.log
+          retention-days: 30
+
+      - name: Report build failure
+        if: steps.build.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tail -n 180 build.log > build-tail.log
+          {
+            echo 'Automated APK build failed.'
+            echo
+            echo '```text'
+            cat build-tail.log
+            echo '```'
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > issue-body.md
+          gh issue create --title "APK build failed (run $GITHUB_RUN_NUMBER)" --body-file issue-body.md
+          exit 1
+
+      - name: Prepare APK
+        if: steps.build.outputs.exit_code == '0'
+        run: |
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)"
+          test -n "$APK"
+          cp "$APK" "DV-Game-test-${GITHUB_RUN_NUMBER}.apk"
+          sha256sum "DV-Game-test-${GITHUB_RUN_NUMBER}.apk" > APK-SHA256.txt
+
+      - name: Upload APK artifact
+        if: steps.build.outputs.exit_code == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dv-game-debug-apk-${{ github.run_number }}
+          path: |
+            DV-Game-test-${{ github.run_number }}.apk
+            APK-SHA256.txt
+          retention-days: 30
+
+      - name: Publish downloadable test release
+        if: steps.build.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="test-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+          gh release create "$TAG" \
+            "DV-Game-test-${GITHUB_RUN_NUMBER}.apk" APK-SHA256.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "DV Game Test #${GITHUB_RUN_NUMBER}" \
+            --notes "Unsigned debug APK for device testing. Built from commit $GITHUB_SHA." \
+            --prerelease

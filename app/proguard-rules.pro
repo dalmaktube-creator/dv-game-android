@@ -1,1 +1,4 @@
-# DV Game MVP — release shrinking will be enabled after tunnel integration tests.
+-keep class io.nekohasekai.libbox.** { *; }
+-keep class go.** { *; }
+-keep class com.dvgame.app.vpn.** { *; }
+-keep class com.dvgame.app.DvApplication { *; }

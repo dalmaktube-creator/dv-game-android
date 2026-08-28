@@ -1,46 +1,48 @@
-# DV Game Android
+# DV Game — Android
 
-Android WireGuard client for **per-game split tunneling**. The user imports a subscription link, selects installed games, and only those Android packages enter the WireGuard tunnel.
+Per-game split tunneling for Android using sing-box/libbox.
 
-## MVP scope
+## Architecture
 
-- Kotlin + Jetpack Compose
-- Detect launchable apps classified by Android as `CATEGORY_GAME`
-- Import a raw, JSON-wrapped, or Base64 WireGuard config from a subscription URL
-- Inject `IncludedApplications` into the WireGuard interface configuration
-- Connect with the official embeddable WireGuard Android tunnel library
-- Game Split mode: non-selected apps use the phone's normal network
-- Game Lock guidance: opens Android VPN settings for Always-on/Lockdown
-- Does not persist the subscription response or private key
-
-## Build
-
-Requirements: JDK 17, Android SDK 35, Gradle 8.10.2.
-
-```bash
-gradle :app:assembleDebug
+```
+User selects games → DvVpnService (VpnService)
+  → sing-tun (mixed stack: system TCP + gVisor UDP)
+  → WireGuard outbound → Iran server → existing tunnels
 ```
 
-APK output:
+- **VPN engine**: sing-box libbox (v1.13.19) via local AAR
+- **TUN stack**: mixed (system for TCP, gVisor for UDP)
+- **Per-app routing**: `OverrideOptions.includePackage` → `VpnService.Builder.addAllowedApplication()`
+- **Config format**: Panel provides WireGuard INI → app converts to sing-box JSON via `SingBoxConfigBuilder`
+- **State management**: Application-scoped `BoxController` with `StateFlow<TunnelState>`
 
-```text
-app/build/outputs/apk/debug/app-debug.apk
+## Setup
+
+1. Download `libbox.aar` — see [app/libs/README.md](app/libs/README.md)
+2. Place it at `app/libs/libbox.aar`
+3. Build with Android Studio or `./gradlew assembleDebug`
+
+## Panel API
+
+The app fetches a DV Game JSON from `/dvgame/<token>`:
+
+```json
+{
+  "apiVersion": 1,
+  "account": { "name": "...", "state": "active", "usedBytes": 0, "totalBytes": 0, "expiryMs": null },
+  "catalog": { "games": [{ "id": "mobile-legends", "name": "Mobile Legends", "packages": ["com.mobile.legends"], "enabled": true }] },
+  "configs": [{ "id": "1", "name": "Germany", "config": "[Interface]\nPrivateKey=...\nAddress=...\n[Peer]\nPublicKey=...\nEndpoint=...\nAllowedIPs=0.0.0.0/0" }]
+}
 ```
 
-## Important behavior
+## Key files
 
-Android implements package-level routing through `VpnService.Builder.addAllowedApplication()`. The WireGuard tunnel library maps the `IncludedApplications` interface field to that API. This means IP, domain, CDN, port, and region lists are not required for the base product.
-
-Game Lock still requires the user to enable **Always-on VPN** and **Block connections without VPN** in Android settings. Device-vendor behavior must be tested before presenting this as a guaranteed kill switch.
-
-## Next milestones
-
-1. Match the exact WG Gaming Panel subscription response schema.
-2. Add QR import and multiple exits.
-3. Add app icons, search, favorites, ping and location selection.
-4. Add signed release builds and private-key storage backed by Android Keystore.
-5. Add device tests for split routing and lockdown behavior.
-
-## Security note
-
-Cleartext HTTP is temporarily enabled because existing panel installations may expose local HTTP subscription URLs. Production deployments should use HTTPS; a later milestone will make cleartext an explicit per-profile opt-in.
+| File | Purpose |
+|------|---------|
+| `DvApplication.kt` | Libbox.setup() initialization |
+| `vpn/DvVpnService.kt` | VpnService + PlatformInterface + CommandServerHandler |
+| `vpn/BoxController.kt` | Application-scoped state management |
+| `vpn/SingBoxConfigBuilder.kt` | WireGuard INI → sing-box JSON |
+| `vpn/PlatformInterfaceImpl.kt` | Default PlatformInterface implementations |
+| `vpn/TunnelState.kt` | Sealed state class |
+| `net/SubscriptionClient.kt` | DV Game JSON parser |

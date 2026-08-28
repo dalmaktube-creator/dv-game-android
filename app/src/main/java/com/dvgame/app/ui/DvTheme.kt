@@ -7,26 +7,17 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Light = lightColorScheme(
-    primary = Color(0xFF2783DE),
-    background = Color(0xFFF9F8F7),
-    surface = Color.White,
-    onBackground = Color(0xFF2C2C2B),
-    outline = Color(0xFFE6E5E3),
+private val DvDark = darkColorScheme(
+    primary = Color(0xFF6366F1), onPrimary = Color.White,
+    background = Color(0xFF0F0F0F), surface = Color(0xFF1A1A1A),
+    surfaceVariant = Color(0xFF242424), error = Color(0xFFEF4444),
 )
-
-private val Dark = darkColorScheme(
-    primary = Color(0xFF5E9FE8),
-    background = Color(0xFF191919),
-    surface = Color(0xFF202020),
-    onBackground = Color.White,
-    outline = Color(0xFF4D4D4B),
+private val DvLight = lightColorScheme(
+    primary = Color(0xFF4F46E5), onPrimary = Color.White,
+    background = Color(0xFFF5F5F5), surface = Color.White,
+    surfaceVariant = Color(0xFFF0F0F0), error = Color(0xFFDC2626),
 )
-
 @Composable
 fun DvTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) Dark else Light,
-        content = content,
-    )
+    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) DvDark else DvLight, content = content)
 }

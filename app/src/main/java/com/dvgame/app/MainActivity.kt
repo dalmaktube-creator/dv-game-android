@@ -1,41 +1,42 @@
 package com.dvgame.app
 
 import android.app.Activity
-import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.lifecycleScope
+import androidx.compose.ui.unit.sp
 import com.dvgame.app.data.GameScanner
 import com.dvgame.app.data.SelectionStore
 import com.dvgame.app.model.GameApp
-import com.dvgame.app.model.TrafficMode
 import com.dvgame.app.net.SubscriptionClient
+import com.dvgame.app.net.SubscriptionResponse
+import com.dvgame.app.net.AccountInfo
 import com.dvgame.app.ui.DvTheme
-import com.dvgame.app.vpn.WireGuardController
+import com.dvgame.app.vpn.BoxController
+import com.dvgame.app.vpn.SingBoxConfigBuilder
+import com.dvgame.app.vpn.TunnelState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
-    private lateinit var controller: WireGuardController
+    private lateinit var controller: BoxController
     private var pendingConnect: (() -> Unit)? = null
 
     private val vpnPermission = registerForActivityResult(
@@ -47,268 +48,261 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        controller = WireGuardController(this)
-        setContent {
-            DvTheme {
-                Surface(Modifier.fillMaxSize()) {
-                    DvGameScreen(
-                        requestConnect = { action ->
-                            val permission = VpnService.prepare(this)
-                            if (permission == null) action()
-                            else {
-                                pendingConnect = action
-                                vpnPermission.launch(permission)
-                            }
-                        },
-                        connect = controller::connect,
-                        disconnect = controller::disconnect,
-                    )
-                }
+        controller = BoxController.get(application)
+        setContent { DvTheme { Surface(Modifier.fillMaxSize()) { DvGameScreen() } } }
+    }
+
+    @Composable
+    private fun DvGameScreen() {
+        val scope = rememberCoroutineScope()
+        val tunnelState by controller.stateFlow.collectAsState()
+        var subUrl by remember { mutableStateOf(SelectionStore.get(this).getSubscriptionUrl()) }
+        var subResponse by remember { mutableStateOf<SubscriptionResponse?>(null) }
+        var loading by remember { mutableStateOf(false) }
+        var error by remember { mutableStateOf<String?>(null) }
+        var selectedConfigId by remember { mutableStateOf("") }
+        val scanner = remember { GameScanner(this) }
+
+        fun doConnect() {
+            val resp = subResponse ?: return
+            val config = resp.configs.find { it.id == selectedConfigId } ?: resp.configs.first()
+            // Auto-include all allowed games that are installed on the phone
+            val packages = resp.games
+                .filter { it.enabled }
+                .filter { scanner.checkPackages(it.packages).isNotEmpty() }
+                .flatMap { it.packages }
+                .toSet()
+            if (packages.isEmpty()) {
+                error = "هیچ بازی مجازی روی گوشی شما نصب نیست"
+                return
+            }
+            error = null
+            scope.launch {
+                val singBoxJson = withContext(Dispatchers.IO) { SingBoxConfigBuilder.build(config.config) }
+                controller.connect(singBoxJson, packages)
             }
         }
-    }
-}
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DvGameScreen(
-    requestConnect: ((() -> Unit)) -> Unit,
-    connect: (String, Set<String>) -> Unit,
-    disconnect: () -> Unit,
-) {
-    val context = LocalContext.current
-    val activity = context as ComponentActivity
-    val store = remember { SelectionStore(context) }
-    var games by remember { mutableStateOf(emptyList<GameApp>()) }
-    var mode by remember { mutableStateOf(store.loadMode()) }
-    var subscriptionUrl by remember { mutableStateOf("") }
-    var config by remember { mutableStateOf<String?>(null) }
-    var connected by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("لینک اشتراک را وارد کنید") }
+        Column(Modifier.fillMaxSize().padding(16.dp)) {
+            Text("DV Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
 
-    LaunchedEffect(Unit) {
-        val selected = store.loadPackages()
-        games = withContext(Dispatchers.IO) { GameScanner.installedGames(context) }
-            .map { it.copy(selected = it.packageName in selected) }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("DV Game", fontWeight = FontWeight.Bold)
-                        Text("فقط بازی، داخل تونل", style = MaterialTheme.typography.labelMedium)
+            OutlinedTextField(
+                value = subUrl,
+                onValueChange = { subUrl = it },
+                label = { Text("لینک اشتراک") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    scope.launch {
+                        loading = true; error = null
+                        try {
+                            val resp = withContext(Dispatchers.IO) { SubscriptionClient.fetch(subUrl) }
+                            subResponse = resp
+                            SelectionStore.get(this@MainActivity).saveSubscriptionUrl(subUrl)
+                            if (selectedConfigId.isEmpty() && resp.configs.isNotEmpty())
+                                selectedConfigId = resp.configs.first().id
+                        } catch (e: Exception) {
+                            error = e.message ?: "خطای نامشخص"
+                        } finally {
+                            loading = false
+                        }
                     }
                 },
-            )
-        },
-        bottomBar = {
-            Surface(tonalElevation = 3.dp) {
+                enabled = !loading && subUrl.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (loading) "در حال دریافت..." else "دریافت اشتراک") }
+
+            error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
+            }
+
+            subResponse?.let { resp ->
+                Spacer(Modifier.height(16.dp))
+                AccountCard(resp.account)
+                Spacer(Modifier.height(12.dp))
+
+                // Server selection (only if multiple configs)
+                if (resp.configs.size > 1) {
+                    Text("انتخاب سرور:", fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(4.dp))
+                    resp.configs.forEach { cfg ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        ) {
+                            RadioButton(
+                                selected = selectedConfigId == cfg.id,
+                                onClick = { selectedConfigId = cfg.id },
+                            )
+                            Text(" ${cfg.name.ifEmpty { cfg.location.ifEmpty { cfg.id } }}")
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                // Game list — read-only, admin-controlled
+                val allowedGames = resp.games.filter { it.enabled }
+                if (allowedGames.isNotEmpty()) {
+                    Text("بازی‌های مجاز:", fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(4.dp))
+                    val gameApps = allowedGames.map { g ->
+                        GameApp(g.id, g.name, g.packages, g.enabled, scanner.checkPackages(g.packages).isNotEmpty())
+                    }
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(gameApps) { game ->
+                            GameRow(game)
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "هیچ بازی مجازی برای این اشتراک فعال نیست.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Connect / Disconnect button
                 Button(
                     onClick = {
-                        if (connected) {
-                            busy = true
-                            activity.lifecycleScope.launch(Dispatchers.IO) {
-                                runCatching { disconnect() }
-                                    .onSuccess {
-                                        withContext(Dispatchers.Main) {
-                                            connected = false; message = "تونل قطع شد"
-                                        }
-                                    }
-                                    .onFailure { e ->
-                                        withContext(Dispatchers.Main) { message = e.message ?: "خطا در قطع اتصال" }
-                                    }
-                                withContext(Dispatchers.Main) { busy = false }
-                            }
-                        } else {
-                            val selected = games.filter { it.selected }.map { it.packageName }.toSet()
-                            val ready = config
-                            if (ready == null) message = "ابتدا کانفیگ را دریافت کنید"
-                            else if (selected.isEmpty()) message = "حداقل یک بازی را انتخاب کنید"
-                            else requestConnect {
-                                busy = true
-                                activity.lifecycleScope.launch(Dispatchers.IO) {
-                                    runCatching { connect(ready, selected) }
-                                        .onSuccess {
-                                            withContext(Dispatchers.Main) {
-                                                connected = true; message = "فقط بازی‌های انتخاب‌شده از VPN عبور می‌کنند"
-                                                if (mode == TrafficMode.GAME_LOCK) {
-                                                    context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
-                                                }
-                                            }
-                                        }
-                                        .onFailure { e ->
-                                            withContext(Dispatchers.Main) { message = e.message ?: "اتصال ناموفق بود" }
-                                        }
-                                    withContext(Dispatchers.Main) { busy = false }
+                        when (tunnelState) {
+                            is TunnelState.Started, is TunnelState.Starting -> controller.disconnect()
+                            else -> {
+                                val prep = VpnService.prepare(this@MainActivity)
+                                if (prep == null) doConnect()
+                                else {
+                                    pendingConnect = ::doConnect
+                                    vpnPermission.launch(prep)
                                 }
                             }
                         }
                     },
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp),
-                    colors = if (connected) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    else ButtonDefaults.buttonColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (tunnelState is TunnelState.Started)
+                            MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary,
+                    ),
                 ) {
-                    if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                    else Text(if (connected) "قطع اتصال" else "اتصال بازی‌ها")
+                    when (tunnelState) {
+                        is TunnelState.Stopped -> Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        is TunnelState.Starting -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        is TunnelState.Started -> Icon(Icons.Default.Stop, contentDescription = null)
+                        is TunnelState.Stopping -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        is TunnelState.Error -> Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(when (tunnelState) {
+                        is TunnelState.Stopped -> "اتصال"
+                        is TunnelState.Starting -> "در حال اتصال..."
+                        is TunnelState.Started -> "قطع"
+                        is TunnelState.Stopping -> "در حال قطع..."
+                        is TunnelState.Error -> "تلاش مجدد"
+                    })
+                }
+
+                (tunnelState as? TunnelState.Error)?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(it.message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
             }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        }
+    }
+
+    @Composable
+    private fun AccountCard(acc: AccountInfo) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            item {
-                StatusCard(connected = connected, message = message)
-            }
-            item {
-                SectionCard("کانفیگ") {
-                    OutlinedTextField(
-                        value = subscriptionUrl,
-                        onValueChange = { subscriptionUrl = it.trim() },
-                        label = { Text("Subscription link") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = {
-                            busy = true
-                            activity.lifecycleScope.launch(Dispatchers.IO) {
-                                runCatching { SubscriptionClient.fetch(subscriptionUrl) }
-                                    .onSuccess {
-                                        config = it
-                                        withContext(Dispatchers.Main) { message = "کانفیگ آماده است" }
-                                    }
-                                    .onFailure { e ->
-                                        withContext(Dispatchers.Main) { message = e.message ?: "دریافت کانفیگ ناموفق بود" }
-                                    }
-                                withContext(Dispatchers.Main) { busy = false }
-                            }
-                        },
-                        enabled = subscriptionUrl.isNotBlank() && !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("دریافت و بررسی کانفیگ") }
-                    Text(
-                        "در نسخه MVP کانفیگ و کلید خصوصی ذخیره نمی‌شود.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+            Column(Modifier.padding(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(acc.name.ifEmpty { "حساب کاربری" }, fontWeight = FontWeight.Medium)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (acc.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    ) {
+                        Text(
+                            if (acc.isActive) "فعال" else "غیرفعال",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                if (acc.totalBytes > 0) {
+                    val pct = (acc.usedBytes.toFloat() / acc.totalBytes.toFloat()).coerceIn(0f, 1f)
+                    LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth().height(6.dp))
+                    Spacer(Modifier.height(4.dp))
+                    Text(formatBytes(acc.remainingBytes) + " باقی‌مانده", fontSize = 12.sp)
+                }
+                acc.remainingDays?.let {
+                    Spacer(Modifier.height(2.dp))
+                    Text("$it روز باقی‌مانده", fontSize = 12.sp)
                 }
             }
-            item {
-                SectionCard("حالت ترافیک") {
-                    ModeRow(
-                        selected = mode,
-                        onChange = {
-                            mode = it
-                            store.saveMode(it)
-                        },
-                    )
-                    if (mode == TrafficMode.GAME_LOCK) {
+        }
+    }
+
+    @Composable
+    private fun GameRow(game: GameApp) {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (game.isInstalled) MaterialTheme.colorScheme.outline
+                else MaterialTheme.colorScheme.outlineVariant,
+            ),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        ) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(game.name, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                    if (game.isInstalled) {
                         Text(
-                            "بعد از اتصال، تنظیمات VPN اندروید باز می‌شود؛ DV Game را Always-on کنید و گزینه Block connections without VPN را روشن کنید.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            "نصب است ✓",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        Text(
+                            "نصب نیست",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (game.isInstalled) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    ) {
+                        Text(
+                            "فعال",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         )
                     }
                 }
             }
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("بازی‌های نصب‌شده", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.weight(1f))
-                    Text("${games.count { it.selected }} انتخاب", style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            if (games.isEmpty()) {
-                item {
-                    Text(
-                        "بازی نصب‌شده‌ای که Android آن را در دسته Game قرار داده باشد پیدا نشد.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                items(games, key = { it.packageName }) { game ->
-                    GameRow(game) {
-                        games = games.map { if (it.packageName == game.packageName) it.copy(selected = !it.selected) else it }
-                        store.savePackages(games.filter { it.selected }.map { it.packageName }.toSet())
-                    }
-                }
-            }
-            item { Spacer(Modifier.height(72.dp)) }
         }
     }
-}
 
-@Composable
-private fun StatusCard(connected: Boolean, message: String) {
-    val tint = if (connected) Color(0xFF46A171) else MaterialTheme.colorScheme.primary
-    Surface(shape = RoundedCornerShape(12.dp), color = tint.copy(alpha = 0.12f)) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(12.dp).background(tint, RoundedCornerShape(6.dp)))
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(if (connected) "متصل" else "آماده‌سازی", fontWeight = FontWeight.Bold)
-                Text(message, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(14.dp))
-            content()
-        }
-    }
-}
-
-@Composable
-private fun ModeRow(selected: TrafficMode, onChange: (TrafficMode) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(
-            selected = selected == TrafficMode.GAME_SPLIT,
-            onClick = { onChange(TrafficMode.GAME_SPLIT) },
-            label = { Text("Game Split") },
-            modifier = Modifier.weight(1f),
-        )
-        FilterChip(
-            selected = selected == TrafficMode.GAME_LOCK,
-            onClick = { onChange(TrafficMode.GAME_LOCK) },
-            label = { Text("Game Lock") },
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun GameRow(game: GameApp, onToggle: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
-    ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(44.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center,
-            ) { Text(game.label.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(game.label, fontWeight = FontWeight.Medium)
-                Text(game.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Checkbox(checked = game.selected, onCheckedChange = { onToggle() })
-        }
+    private fun formatBytes(bytes: Long): String = when {
+        bytes >= 1_073_741_824 -> "%.1f GB".format(bytes / 1_073_741_824.0)
+        bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
+        bytes >= 1024 -> "%.0f KB".format(bytes / 1024.0)
+        else -> "$bytes B"
     }
 }
