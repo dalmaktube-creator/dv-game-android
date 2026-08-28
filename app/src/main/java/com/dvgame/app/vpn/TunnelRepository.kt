@@ -16,6 +16,21 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 
+private val PACKAGE_NAME_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
+
+internal fun scopeConfigToPackage(raw: String, packageName: String): String {
+    require(PACKAGE_NAME_PATTERN.matches(packageName)) { "نام پکیج بازی نامعتبر است" }
+    val clean = raw.lineSequence().filterNot {
+        val value = it.trimStart()
+        value.startsWith("IncludedApplications", true) || value.startsWith("ExcludedApplications", true)
+    }.toMutableList()
+    val interfaceIndexes = clean.indices.filter { clean[it].trim().equals("[Interface]", true) }
+    require(interfaceIndexes.size == 1) { "ساختار Interface کانفیگ نامعتبر است" }
+    require(clean.count { it.trim().equals("[Peer]", true) } >= 1) { "بخش Peer در کانفیگ پیدا نشد" }
+    clean.add(interfaceIndexes.single() + 1, "IncludedApplications = $packageName")
+    return clean.joinToString("\n")
+}
+
 class TunnelRepository(private val context: Context, private val scope: CoroutineScope) {
     private val backend = GoBackend(context)
     private val secureStore = SecureTunnelStore(context)
@@ -37,7 +52,7 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
         mutableStatus.value = TunnelStatus.Connecting
         activePackage = approvedPackage
         try {
-            val scoped = withIncludedApplication(rawConfig, approvedPackage)
+            val scoped = scopeConfigToPackage(rawConfig, approvedPackage)
             val parsed = Config.parse(ByteArrayInputStream(scoped.toByteArray(Charsets.UTF_8)))
             withContext(Dispatchers.IO) { backend.setState(tunnel, Tunnel.State.UP, parsed) }
             secureStore.save(rawConfig, approvedPackage)
@@ -61,18 +76,11 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
         runCatching { connect(saved.first, saved.second) }
     }
 
-    internal fun withIncludedApplication(raw: String, packageName: String): String {
-        val clean = raw.lineSequence().filterNot {
-            val value = it.trimStart()
-            value.startsWith("IncludedApplications", true) || value.startsWith("ExcludedApplications", true)
-        }.toMutableList()
-        val index = clean.indexOfFirst { it.trim().equals("[Interface]", true) }
-        require(index >= 0) { "بخش Interface در کانفیگ پیدا نشد" }
-        clean.add(index + 1, "IncludedApplications = $packageName")
-        return clean.joinToString("\n")
+    private fun isInstalled(packageName: String): Boolean {
+        if (!PACKAGE_NAME_PATTERN.matches(packageName)) return false
+        return runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.isSuccess
     }
 
-    private fun isInstalled(packageName: String) = runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.isSuccess
     private fun messageFor(error: Throwable): String = when ((error as? BackendException)?.reason) {
         BackendException.Reason.VPN_NOT_AUTHORIZED -> "مجوز VPN صادر نشده است"
         BackendException.Reason.DNS_RESOLUTION_FAILURE -> "نام سرور قابل شناسایی نیست"
