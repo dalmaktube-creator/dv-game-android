@@ -27,12 +27,12 @@ jobs:
         run: |
           set -o pipefail
           gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
-          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha03-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha04-debug.apk
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: dv-game-debug-apk
-          path: DV-Game-0.2.0-alpha03-debug.apk
+          path: DV-Game-0.2.0-alpha04-debug.apk
           if-no-files-found: error
           retention-days: 7
       - name: Publish alpha release
@@ -41,12 +41,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create v0.2.0-alpha.3 \
-            DV-Game-0.2.0-alpha03-debug.apk \
+          gh release create v0.2.0-alpha.4 \
+            DV-Game-0.2.0-alpha04-debug.apk \
             --target "$GITHUB_SHA" \
-            --title "DV Game 0.2.0 Alpha 3" \
+            --title "DV Game 0.2.0 Alpha 4" \
             --prerelease \
-            --notes "نسخه تشخیصی برای مسیر مستقیم WireGuard روی Android 14. سرویس‌های ضروری Google Play حفظ شده‌اند. DNS، MTU، AllowedIPs و Keepalive دقیقاً از کانفیگ پنل عبور می‌کنند و هیچ DNS عمومی در اپ تزریق نمی‌شود. پس از بازگشت از بازی، وضعیت Handshake و RX/TX در اپ نمایش داده می‌شود."
+            --notes "نسخه آزمایشی اصلاح مسیر IPv6 در Per-App WireGuard. اگر کانفیگ پنل فقط آدرس IPv4 داشته باشد، مسیر ::/0 برای اپ حذف و IPv6 به‌صورت fail-closed مسدود می‌شود تا بازی منتظر مسیر IPv6 بدون آدرس نماند. DNS Lock، DNS کانفیگ، MTU، Endpoint، مسیر IPv4 و Keepalive دست‌نخورده‌اند. سرویس‌های ضروری Google Play و telemetry آلفا ۳ حفظ شده‌اند."
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:
@@ -56,7 +56,7 @@ jobs:
           {
             echo '### Android compiler diagnostics'
             echo '```text'
-            grep -nE '(^e: |error:|Unresolved reference|Compilation error|FAILURE:|What went wrong)' build.log | tail -n 120 || true
+            grep -nE '(^e: |error:|Unresolved reference|Compilation error|FAILED|FAILURE:|What went wrong|AssertionError)' build.log | tail -n 160 || true
             echo '```'
           } > build-comment.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file build-comment.md

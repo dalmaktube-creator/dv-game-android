@@ -52,6 +52,46 @@ internal fun scopeConfigToPackages(raw: String, packageNames: Set<String>): Stri
     return clean.joinToString("\n")
 }
 
+/* The panel currently emits an IPv4 client address with dual-stack
+ * AllowedIPs. On Android this can install ::/0 without any IPv6 interface
+ * address, leaving games waiting on an unusable IPv6 path before falling back.
+ * Fail closed instead: when the interface has no IPv6 address, remove only
+ * IPv6 AllowedIPs. IPv6 is then blocked by VpnService rather than leaked to
+ * the underlying network. DNS and every IPv4 route remain untouched. */
+internal fun removeUnconfiguredIpv6Routes(raw: String): String {
+    val lines = raw.lines()
+    var section = ""
+    var hasIpv6InterfaceAddress = false
+    for (line in lines) {
+        val trimmed = line.trim()
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            section = trimmed.lowercase()
+            continue
+        }
+        if (section == "[interface]" && trimmed.substringBefore('=').trim().equals("Address", true)) {
+            val values = trimmed.substringAfter('=', "").split(',')
+            if (values.any { it.trim().contains(':') }) hasIpv6InterfaceAddress = true
+        }
+    }
+    if (hasIpv6InterfaceAddress) return raw
+
+    section = ""
+    return lines.map { line ->
+        val trimmed = line.trim()
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            section = trimmed.lowercase()
+            line
+        } else if (section == "[peer]" && trimmed.substringBefore('=').trim().equals("AllowedIPs", true)) {
+            val ipv4Only = trimmed.substringAfter('=', "").split(',')
+                .map(String::trim)
+                .filter { it.isNotEmpty() && !it.contains(':') }
+            require(ipv4Only.isNotEmpty()) { "کانفیگ بدون مسیر IPv4 قابل استفاده نیست" }
+            val indent = line.takeWhile(Char::isWhitespace)
+            "${indent}AllowedIPs = ${ipv4Only.joinToString(", ")}"
+        } else line
+    }.joinToString("\n")
+}
+
 internal fun scopeConfigToPackage(raw: String, packageName: String): String =
     scopeConfigToPackages(raw, setOf(packageName))
 
@@ -84,10 +124,12 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
                 add(approvedPackage)
                 ESSENTIAL_GAME_SERVICES.filterTo(this) { isInstalled(it) }
             }
-            /* Only application routing is replaced. DNS, MTU, endpoint,
-             * AllowedIPs and keepalive remain byte-for-byte from the panel
-             * configuration so the server-side DNS lock keeps authority. */
-            val scoped = scopeConfigToPackages(rawConfig, routedPackages)
+            val networkSafe = removeUnconfiguredIpv6Routes(rawConfig)
+            /* Only application routing and the invalid IPv6-only route case
+             * are adjusted. DNS, MTU, endpoint, IPv4 AllowedIPs and keepalive
+             * remain from the panel so the server-side DNS lock stays in
+             * complete control. */
+            val scoped = scopeConfigToPackages(networkSafe, routedPackages)
             val parsed = Config.parse(ByteArrayInputStream(scoped.toByteArray(Charsets.UTF_8)))
             withContext(Dispatchers.IO) { backend.setState(tunnel, Tunnel.State.UP, parsed) }
             secureStore.save(rawConfig, approvedPackage, restoreValidUntilMs)
