@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
         setContent { DvTheme { DvGameScreen() } }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun DvGameScreen() {
         var link by remember { mutableStateOf("") }
