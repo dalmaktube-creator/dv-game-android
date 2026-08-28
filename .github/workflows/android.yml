@@ -2,7 +2,7 @@ name: android
 
 on:
   push:
-    branches: [main, feat/app-v1, agent/alpha5-xray-wireguard-compat]
+    branches: [main, feat/app-v1, agent/alpha5-jni-crash-hotfix]
   pull_request:
   workflow_dispatch:
 
@@ -35,31 +35,37 @@ jobs:
           echo "62b0675c0986a8613f1bb67f1a68c366c6357e04a68687a3bd907170594c437d  /tmp/v2rayng.apk" | sha256sum -c -
           unzip -q /tmp/v2rayng.apk 'lib/arm64-v8a/libhev-socks5-tunnel.so' -d /tmp/dv-hev
           cp /tmp/dv-hev/lib/arm64-v8a/libhev-socks5-tunnel.so app/src/main/jniLibs/arm64-v8a/
+      - name: Verify HEV JNI declaration matches pinned binary contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'external fun TProxyStartService(configPath: String, fd: Int)$' app/src/main/java/com/v2ray/ang/service/TProxyService.kt
+          ! grep -q 'TProxyStartService(configPath: String, fd: Int): Boolean' app/src/main/java/com/v2ray/ang/service/TProxyService.kt
       - name: Test and build debug APK
         shell: bash
         run: |
           set -o pipefail
           gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
-          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha05-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha05.1-debug.apk
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: dv-game-alpha05-debug-apk
-          path: DV-Game-0.2.0-alpha05-debug.apk
+          name: dv-game-alpha05.1-debug-apk
+          path: DV-Game-0.2.0-alpha05.1-debug.apk
           if-no-files-found: error
           retention-days: 7
-      - name: Publish alpha release
+      - name: Publish alpha hotfix release
         if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create v0.2.0-alpha.5 \
-            DV-Game-0.2.0-alpha05-debug.apk \
+          gh release create v0.2.0-alpha.5.1 \
+            DV-Game-0.2.0-alpha05.1-debug.apk \
             --target "$GITHUB_SHA" \
-            --title "DV Game 0.2.0 Alpha 5" \
+            --title "DV Game 0.2.0 Alpha 5.1" \
             --prerelease \
-            --notes "موتور سازگار UDP مخصوص بازی، بر پایه تست واقعی Mobile Legends. رابط Per-App اندروید حفظ شده و فقط بازی و سرویس‌های ضروری Google وارد TUN می‌شوند؛ سپس HEV SOCKS5 نشست‌های UDP را مدیریت می‌کند و Xray همان کانفیگ WireGuard پنل را به‌عنوان outbound اجرا می‌کند. DNS پنل داخل WireGuard باقی می‌ماند و مرورگر و سایر برنامه‌ها مستقیم هستند. وابستگی‌های باینری با نسخه و SHA-256 ثابت دریافت می‌شوند. این نسخه فعلاً فقط arm64-v8a و آزمایشی است."
+            --notes "Hotfix کرش هنگام زدن دکمه بازی: امضای JNI موتور HEV اکنون دقیقاً با باینری pinned v2rayNG 2.2.6 یکسان است (توابع native از نوع void/Unit هستند، نه Boolean). شرط خواندن مقدار بازگشتی نامعتبر که می‌توانست اجرای native را متوقف یا process را ناپایدار کند حذف شد. مسیر HEV + Xray WireGuard، DNS پنل، Peer، کلیدها و Per-App allowlist تغییری نکرده‌اند. لینک اشتراک موفق نیز روی دستگاه نگه داشته می‌شود."
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:
