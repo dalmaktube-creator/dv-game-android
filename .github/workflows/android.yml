@@ -27,6 +27,13 @@ jobs:
         run: |
           set -o pipefail
           gradle :app:assembleDebug --stacktrace 2>&1 | tee build.log
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dv-game-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:
