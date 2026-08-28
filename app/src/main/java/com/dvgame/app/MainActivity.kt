@@ -73,10 +73,18 @@ class MainActivity : ComponentActivity() {
                             lifecycleScope.launch {
                                 runCatching { withContext(Dispatchers.IO) { SubscriptionClient.fetch(link) } }
                                     .onSuccess { result ->
-                                        subscription = result; profileIndex = 0
-                                        games = withContext(Dispatchers.IO) {
-                                            GameScanner.findApprovedInstalledGames(this@MainActivity, result.games) }
-                                        message = if (games.isEmpty()) "هیچ بازی مجاز نصب‌شده‌ای پیدا نشد" else "اشتراک آماده است"
+                                        subscription = result
+                                        profileIndex = 0
+                                        val blockReason = result.account.connectionBlockReason()
+                                        if (blockReason != null) {
+                                            games = emptyList()
+                                            message = blockReason
+                                        } else {
+                                            games = withContext(Dispatchers.IO) {
+                                                GameScanner.findApprovedInstalledGames(this@MainActivity, result.games)
+                                            }
+                                            message = if (games.isEmpty()) "هیچ بازی مجاز نصب‌شده‌ای پیدا نشد" else "اشتراک آماده است"
+                                        }
                                     }.onFailure { message = it.message ?: "دریافت اشتراک ناموفق بود" }
                                 loading = false
                             }
@@ -101,7 +109,7 @@ class MainActivity : ComponentActivity() {
                     if (games.isEmpty()) item { Text("بازی‌های این بخش فقط توسط ادمین پنل تعیین می‌شوند.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     else items(games, key = { it.packageName }) { game ->
                         GameCard(game, tunnelStatus !is TunnelStatus.Connecting) {
-                            connectAndLaunch(sub.profiles[profileIndex], game) { message = it }
+                            connectAndLaunch(sub.account, sub.profiles[profileIndex], game) { message = it }
                         }
                     }
                 }
@@ -109,7 +117,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun connectAndLaunch(profile: ServerProfile, game: InstalledGame, setMessage: (String) -> Unit) {
+    private fun connectAndLaunch(account: AccountInfo, profile: ServerProfile, game: InstalledGame, setMessage: (String) -> Unit) {
+        val blockReason = account.connectionBlockReason()
+        if (blockReason != null) {
+            setMessage(blockReason)
+            return
+        }
         val action: () -> Unit = {
             lifecycleScope.launch { runCatching { repository.connect(profile.config, game.packageName) }
                 .onSuccess {
