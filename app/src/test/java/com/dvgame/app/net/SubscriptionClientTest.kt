@@ -7,11 +7,16 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SubscriptionClientTest {
-    private fun payload(apiVersion: Int = 1, state: String = "active") = """
-        {"apiVersion":$apiVersion,"account":{"name":"demo","state":"$state","usedBytes":0,"totalBytes":100,"expiryMs":null},
-         "catalog":{"version":2,"digest":"sha256:test","games":[{"id":"pubg","name":"PUBG","packages":["com.tencent.ig"]}]},
-         "configs":[{"id":"1","name":"DE","location":"Germany","config":"[Interface]\\nPrivateKey = x\\n[Peer]\\nPublicKey = y"}]}
-    """.trimIndent()
+    private fun payload(apiVersion: Int = 1, state: String = "active"): String {
+        val config = "[Interface]\nPrivateKey = x\n[Peer]\nPublicKey = y"
+            .replace("\\", "\\\\")
+            .replace("\n", "\\n")
+        return """
+            {"apiVersion":$apiVersion,"account":{"name":"demo","state":"$state","usedBytes":0,"totalBytes":100,"expiryMs":null},
+             "catalog":{"version":2,"digest":"sha256:test","games":[{"id":"pubg","name":"PUBG","packages":["com.tencent.ig"]}]},
+             "configs":[{"id":"1","name":"DE","location":"Germany","config":"$config"}]}
+        """.trimIndent()
+    }
 
     @Test fun parsesVersionedPanelPayload() {
         val result = SubscriptionClient.parse(payload())
