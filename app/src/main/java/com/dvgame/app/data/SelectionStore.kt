@@ -1,23 +1,16 @@
 package com.dvgame.app.data
 
 import android.content.Context
-import com.dvgame.app.model.TrafficMode
+import android.content.SharedPreferences
 
-class SelectionStore(context: Context) {
-    private val prefs = context.getSharedPreferences("dv_game", Context.MODE_PRIVATE)
-
-    fun loadPackages(): Set<String> =
-        prefs.getStringSet("selected_packages", emptySet())?.toSet().orEmpty()
-
-    fun savePackages(packages: Set<String>) {
-        prefs.edit().putStringSet("selected_packages", packages).apply()
-    }
-
-    fun loadMode(): TrafficMode = runCatching {
-        TrafficMode.valueOf(prefs.getString("traffic_mode", null) ?: "GAME_SPLIT")
-    }.getOrDefault(TrafficMode.GAME_SPLIT)
-
-    fun saveMode(mode: TrafficMode) {
-        prefs.edit().putString("traffic_mode", mode.name).apply()
+class SelectionStore private constructor(private val prefs: SharedPreferences) {
+    fun saveSubscriptionUrl(url: String) { prefs.edit().putString(KEY_SUB_URL, url).apply() }
+    fun getSubscriptionUrl(): String = prefs.getString(KEY_SUB_URL, "") ?: ""
+    companion object {
+        private const val KEY_SUB_URL = "sub_url"
+        @Volatile private var instance: SelectionStore? = null
+        fun get(context: Context): SelectionStore = instance ?: synchronized(this) {
+            instance ?: SelectionStore(context.applicationContext.getSharedPreferences("dvgame", Context.MODE_PRIVATE)).also { instance = it }
+        }
     }
 }
