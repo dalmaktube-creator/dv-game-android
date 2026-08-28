@@ -60,8 +60,9 @@ interface PlatformInterfaceImpl : PlatformInterface {
     override fun registerMyInterface(name: String?) {}
 }
 
-class StringIteratorImpl(private val iter: Iterator<String>) : StringIterator {
-    override fun len(): Int = 0
-    override fun hasNext(): Boolean = iter.hasNext()
-    override fun next(): String = iter.next()
+class StringIteratorImpl(private val items: List<String>) : StringIterator {
+    private var index = 0
+    override fun len(): Int = items.size
+    override fun hasNext(): Boolean = index < items.size
+    override fun next(): String = items[index++]
 }
