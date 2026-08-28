@@ -78,6 +78,23 @@ jobs:
             libbox.sha256
           if-no-files-found: error
           retention-days: 14
+      - name: Publish Alpha 6 release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.2.0-alpha.6 >/dev/null 2>&1; then
+            gh release upload v0.2.0-alpha.6 DV-Game-0.2.0-alpha06-debug.apk libbox.sha256 --clobber
+          else
+            gh release create v0.2.0-alpha.6 \
+              DV-Game-0.2.0-alpha06-debug.apk libbox.sha256 \
+              --target "$GITHUB_SHA" \
+              --title "DV Game 0.2.0 Alpha 6" \
+              --prerelease \
+              --notes "نسخه آزمایشی هسته جدید: sing-box/libbox v1.13.19 با sing-tun mixed stack (System TCP + gVisor UDP) و WireGuard endpoint متصل به همان کلاینت، لوکیشن و تونل‌های فعلی پنل. مسیر HEV/Xray حذف شده است. پنل، کاربران فعلی و روش WireGuard رسمی تغییری نکرده‌اند. مخصوص تست Redmi Note 14 / Android 14 با Mobile Legends و لوکیشن‌های موجود."
+          fi
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:
