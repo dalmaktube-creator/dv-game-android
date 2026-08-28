@@ -1,36 +1,23 @@
 # DV Game Android
 
-Android game-only VPN client controlled by WG Gaming Panel.
+Android game-only VPN client controlled by the existing WG Gaming Panel.
 
-## Alpha 5 data path
-
-Alpha 5 keeps the panel WireGuard peer, keys, endpoint, AllowedIPs, MTU and DNS, but adds an opt-in-compatible game data path based on the successful Redmi Note 14 trace:
+## Alpha 6 data path
 
 ```text
-game UID -> Android VpnService -> hev-socks5-tunnel -> Xray WireGuard outbound -> existing panel peer
+approved game package -> Android VpnService -> sing-tun mixed stack
+(system TCP + gVisor UDP) -> sing-box WireGuard endpoint -> existing Iran peer
+-> existing panel-selected Pure Hysteria route/location
 ```
 
-Only the selected game and installed Google identity/game-save packages are admitted to the Android TUN. DV Game itself is not admitted, so the Xray/WireGuard transport socket uses the underlying network and cannot loop into the VPN. Other apps, including browsers, remain direct.
+Alpha 6 does not add a test location and does not change the panel, server tunnels, `/sub/`, QR codes, normal WireGuard configs, quota, expiry, or existing clients. It consumes the already-available `/dvgame/<token>` JSON and converts the same single-peer WireGuard profile locally on Android.
 
-The original official WireGuard Android tunnel dependency remains pinned in the application for config validation and compatibility. Alpha 5's UDP compatibility engine is used for the game path because the official `wireguard-go` TUN path reproduced multi-minute loading and lobby drops whenever Android per-app routing was enabled on the test device.
+The failed Alpha 5 HEV -> SOCKS -> Xray chain has been removed. The replacement is one pinned upstream core (`sing-box/libbox` v1.13.19), one TUN, and one WireGuard endpoint. Only the package approved by the panel is admitted to Android's VPN. There is no arbitrary app picker.
 
-## Security and DNS
+## First device test
 
-- Subscription fetch remains HTTPS-only with bounded responses and redirect validation.
-- WireGuard configurations are validated by the official parser before use.
-- The private key is retained only in memory and in the existing AES-GCM/Android-Keystore short restore lease.
-- Panel DNS addresses are carried through the WireGuard outbound; no public DNS is injected.
-- Exactly one panel peer is accepted by the compatibility engine.
-- Android application allowlisting remains fail-closed.
-- Xray and HEV binary inputs are pinned by release and SHA-256 in CI.
-- Alpha 5 is arm64-v8a only.
+Use the existing personal client and any already-configured location. Validate subscription, connection, Mobile Legends loading, lobby, match start, UDP continuity, and panel RX/TX accounting on the Redmi Note 14 / Android 14.
 
-## Build
+## Licensing
 
-CI fetches the pinned `AndroidLibXrayLite v26.8.20` AAR and the pinned HEV native library before building. The SHA-256 checks in `.github/workflows/android.yml` are mandatory.
-
-```bash
-gradle :app:testDebugUnitTest :app:assembleDebug
-```
-
-This is an alpha build and must be validated on the target device before production use.
+sing-box/libbox is built from the unmodified upstream v1.13.19 source in CI. Distribution must comply with its GPLv3 license; upstream source and exact build command are recorded in the workflow.

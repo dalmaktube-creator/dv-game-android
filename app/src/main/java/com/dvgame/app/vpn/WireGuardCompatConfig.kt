@@ -25,7 +25,6 @@ internal fun parseWireGuardCompatConfig(raw: String): WireGuardCompatConfig {
     }.joinToString("\n")
     Config.parse(ByteArrayInputStream(validationCopy.toByteArray(Charsets.UTF_8)))
 
-    var section = ""
     val interfaces = mutableListOf<MutableMap<String, String>>()
     val peers = mutableListOf<MutableMap<String, String>>()
     var current: MutableMap<String, String>? = null
@@ -33,8 +32,7 @@ internal fun parseWireGuardCompatConfig(raw: String): WireGuardCompatConfig {
         val line = source.substringBefore('#').trim()
         if (line.isEmpty()) return@forEach
         if (line.startsWith("[") && line.endsWith("]")) {
-            section = line.lowercase()
-            current = when (section) {
+            current = when (line.lowercase()) {
                 "[interface]" -> mutableMapOf<String, String>().also(interfaces::add)
                 "[peer]" -> mutableMapOf<String, String>().also(peers::add)
                 else -> null
@@ -42,77 +40,102 @@ internal fun parseWireGuardCompatConfig(raw: String): WireGuardCompatConfig {
             return@forEach
         }
         val split = line.indexOf('=')
-        if (split <= 0 || current == null) return@forEach
-        current!![line.substring(0, split).trim().lowercase()] = line.substring(split + 1).trim()
+        if (split > 0 && current != null) {
+            current!![line.substring(0, split).trim().lowercase()] = line.substring(split + 1).trim()
+        }
     }
     require(interfaces.size == 1) { "کانفیگ باید دقیقاً یک Interface داشته باشد" }
-    require(peers.size == 1) { "موتور سازگار فقط کانفیگ تک Peer پنل را می‌پذیرد" }
+    require(peers.size == 1) { "موتور بازی فقط کانفیگ تک Peer پنل را می‌پذیرد" }
     val intf = interfaces.single()
     val peer = peers.single()
     fun csv(value: String?): List<String> = value.orEmpty().split(',').map(String::trim).filter(String::isNotEmpty)
-    val addresses = csv(intf["address"])
-    val dns = csv(intf["dns"]).filter { isIpLiteral(it) }
-    val allowed = csv(peer["allowedips"])
-    require(addresses.isNotEmpty()) { "Address کانفیگ پیدا نشد" }
-    require(addresses.any { !it.contains(':') }) { "نسخه آزمایشی به Address IPv4 نیاز دارد" }
+    val addresses = csv(intf["address"]).filterNot { it.contains(':') }
+    val dns = csv(intf["dns"]).filter { isIpv4Literal(it) }
+    val allowed = csv(peer["allowedips"]).filterNot { it.contains(':') }
+    require(addresses.isNotEmpty()) { "نسخه آزمایشی به Address IPv4 نیاز دارد" }
     require(dns.isNotEmpty()) { "DNS عددی پنل در کانفیگ پیدا نشد" }
-    require(allowed.any { !it.contains(':') }) { "مسیر IPv4 در Peer پیدا نشد" }
+    require(allowed.isNotEmpty()) { "مسیر IPv4 در Peer پیدا نشد" }
     val mtu = intf["mtu"]?.toIntOrNull() ?: 1280
     require(mtu in 576..1500) { "MTU کانفیگ نامعتبر است" }
     val keepalive = peer["persistentkeepalive"]?.toIntOrNull() ?: 0
     require(keepalive in 0..65535) { "Keepalive کانفیگ نامعتبر است" }
     return WireGuardCompatConfig(
         privateKey = intf["privatekey"].orEmpty().also { require(it.isNotBlank()) { "PrivateKey پیدا نشد" } },
-        addresses = addresses.filterNot { it.contains(':') },
-        dnsServers = dns.filterNot { it.contains(':') },
+        addresses = addresses,
+        dnsServers = dns,
         mtu = mtu,
         peerPublicKey = peer["publickey"].orEmpty().also { require(it.isNotBlank()) { "PublicKey پیدا نشد" } },
         peerPresharedKey = peer["presharedkey"]?.takeIf(String::isNotBlank),
         endpoint = peer["endpoint"].orEmpty().also { require(it.isNotBlank()) { "Endpoint پیدا نشد" } },
-        allowedIps = allowed.filterNot { it.contains(':') },
+        allowedIps = allowed,
         persistentKeepalive = keepalive,
     )
 }
 
-private fun isIpLiteral(value: String): Boolean {
-    val host = value.substringBefore('%').substringBefore('/')
-    return host.contains(':') || (host.split('.').size == 4 && host.split('.').all { it.toIntOrNull() in 0..255 })
+private fun isIpv4Literal(value: String): Boolean {
+    val parts = value.substringBefore('/').split('.')
+    return parts.size == 4 && parts.all { it.toIntOrNull() in 0..255 }
 }
 
-internal fun buildXrayWireGuardConfig(config: WireGuardCompatConfig): String {
+private fun splitEndpoint(value: String): Pair<String, Int> {
+    if (value.startsWith("[")) {
+        val end = value.indexOf(']')
+        require(end > 1 && value.getOrNull(end + 1) == ':') { "Endpoint نامعتبر است" }
+        return value.substring(1, end) to value.substring(end + 2).toInt()
+    }
+    val split = value.lastIndexOf(':')
+    require(split > 0) { "Endpoint نامعتبر است" }
+    return value.substring(0, split) to value.substring(split + 1).toInt()
+}
+
+internal fun buildLibboxWireGuardConfig(config: WireGuardCompatConfig, packageName: String): String {
+    val (server, port) = splitEndpoint(config.endpoint)
+    require(port in 1..65535) { "پورت Endpoint نامعتبر است" }
     val peer = JSONObject()
-        .put("publicKey", config.peerPublicKey)
-        .put("endpoint", config.endpoint)
-        .put("keepAlive", config.persistentKeepalive)
-        .put("allowedIPs", JSONArray(config.allowedIps))
-    config.peerPresharedKey?.let { peer.put("preSharedKey", it) }
-    val wgSettings = JSONObject()
-        .put("secretKey", config.privateKey)
-        .put("address", JSONArray(config.addresses))
-        .put("peers", JSONArray().put(peer))
+        .put("address", server)
+        .put("port", port)
+        .put("public_key", config.peerPublicKey)
+        .put("allowed_ips", JSONArray(config.allowedIps))
+        .put("persistent_keepalive_interval", config.persistentKeepalive)
+    config.peerPresharedKey?.let { peer.put("pre_shared_key", it) }
+
+    val endpoint = JSONObject()
+        .put("type", "wireguard")
+        .put("tag", "wg-game")
+        .put("system", false)
         .put("mtu", config.mtu)
-        .put("domainStrategy", "ForceIPv4")
-        .put("remoteDNS", JSONArray(config.dnsServers))
-        .put("noKernelTun", true)
-    val socksInbound = JSONObject()
+        .put("address", JSONArray(config.addresses))
+        .put("private_key", config.privateKey)
+        .put("peers", JSONArray().put(peer))
+        .put("udp_timeout", "10m")
+        .put("workers", 2)
+
+    val tun = JSONObject()
+        .put("type", "tun")
         .put("tag", "game-tun")
-        .put("listen", "127.0.0.1")
-        .put("port", 10808)
-        .put("protocol", "socks")
-        .put("settings", JSONObject().put("auth", "noauth").put("udp", true).put("userLevel", 8))
-        .put("sniffing", JSONObject().put("enabled", true).put("destOverride", JSONArray(listOf("http", "tls", "quic"))))
-    val outbound = JSONObject()
-        .put("tag", "wireguard-game")
-        .put("protocol", "wireguard")
-        .put("settings", wgSettings)
+        .put("address", JSONArray().put("172.19.0.1/30"))
+        .put("mtu", minOf(config.mtu, 1280))
+        .put("auto_route", true)
+        .put("stack", "mixed")
+        .put("endpoint_independent_nat", false)
+        .put("udp_timeout", "10m")
+        .put("include_package", JSONArray().put(packageName))
+
+    val panelDns = JSONObject()
+        .put("type", "udp")
+        .put("tag", "panel-dns")
+        .put("server", config.dnsServers.first())
+        .put("server_port", 53)
+        .put("detour", "wg-game")
+
     return JSONObject()
-        .put("log", JSONObject().put("loglevel", "warning"))
-        .put("policy", JSONObject()
-            .put("levels", JSONObject().put("8", JSONObject()
-                .put("handshake", 4).put("connIdle", 300).put("uplinkOnly", 1).put("downlinkOnly", 1)))
-            .put("system", JSONObject().put("statsOutboundUplink", true).put("statsOutboundDownlink", true)))
-        .put("inbounds", JSONArray().put(socksInbound))
-        .put("outbounds", JSONArray().put(outbound))
-        .put("routing", JSONObject().put("domainStrategy", "AsIs").put("rules", JSONArray()))
+        .put("log", JSONObject().put("level", "info").put("timestamp", true))
+        .put("dns", JSONObject().put("servers", JSONArray().put(panelDns)).put("final", "panel-dns"))
+        .put("inbounds", JSONArray().put(tun))
+        .put("endpoints", JSONArray().put(endpoint))
+        .put("route", JSONObject()
+            .put("auto_detect_interface", true)
+            .put("final", "wg-game")
+            .put("rules", JSONArray().put(JSONObject().put("protocol", "dns").put("action", "hijack-dns"))))
         .toString()
 }
