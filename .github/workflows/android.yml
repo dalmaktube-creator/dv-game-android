@@ -22,17 +22,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
-      - name: Build debug APK
+      - name: Test and build debug APK
         shell: bash
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --stacktrace 2>&1 | tee build.log
-          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha02-debug.apk
+          gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha03-debug.apk
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: dv-game-debug-apk
-          path: DV-Game-0.2.0-alpha02-debug.apk
+          path: DV-Game-0.2.0-alpha03-debug.apk
           if-no-files-found: error
           retention-days: 7
       - name: Publish alpha release
@@ -41,12 +41,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create v0.2.0-alpha.2 \
-            DV-Game-0.2.0-alpha02-debug.apk \
+          gh release create v0.2.0-alpha.3 \
+            DV-Game-0.2.0-alpha03-debug.apk \
             --target "$GITHUB_SHA" \
-            --title "DV Game 0.2.0 Alpha 2" \
+            --title "DV Game 0.2.0 Alpha 3" \
             --prerelease \
-            --notes "نسخه آزمایشی داخلی برای تست مسیر‌دهی هم‌زمان بازی و سرویس‌های ضروری Google Play روی Android 14. Play Store، Download Manager، مرورگرها و شبکه‌های اجتماعی داخل تونل نیستند."
+            --notes "نسخه تشخیصی برای مسیر مستقیم WireGuard روی Android 14. سرویس‌های ضروری Google Play حفظ شده‌اند. DNS، MTU، AllowedIPs و Keepalive دقیقاً از کانفیگ پنل عبور می‌کنند و هیچ DNS عمومی در اپ تزریق نمی‌شود. پس از بازگشت از بازی، وضعیت Handshake و RX/TX در اپ نمایش داده می‌شود."
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:

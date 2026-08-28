@@ -24,6 +24,7 @@ import com.dvgame.app.data.GameScanner
 import com.dvgame.app.model.*
 import com.dvgame.app.net.SubscriptionClient
 import com.dvgame.app.ui.DvTheme
+import com.dvgame.app.vpn.TunnelTelemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,13 +52,14 @@ class MainActivity : ComponentActivity() {
         var loading by remember { mutableStateOf(false) }
         var message by remember { mutableStateOf("لینک اشتراک را وارد کنید") }
         val tunnelStatus by repository.status.collectAsState()
+        val telemetry by repository.telemetry.collectAsState()
         Scaffold(topBar = { TopAppBar(title = { Column {
             Text("DV Game", fontWeight = FontWeight.Bold)
             Text("فقط بازی‌های تأییدشده داخل تونل", style = MaterialTheme.typography.labelSmall)
         } }) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                item { StatusCard(tunnelStatus, message) {
+                item { StatusCard(tunnelStatus, telemetry, message) {
                     lifecycleScope.launch { runCatching { repository.disconnect() }
                         .onSuccess { message = "اتصال قطع شد" }
                         .onFailure { message = it.message ?: "قطع اتصال ناموفق بود" } }
@@ -130,7 +132,7 @@ class MainActivity : ComponentActivity() {
                 .onSuccess {
                     val launch = packageManager.getLaunchIntentForPackage(game.packageName)
                     if (launch == null) setMessage("اجرای بازی ممکن نیست") else {
-                        setMessage("متصل؛ در حال اجرای ${game.name}")
+                        setMessage("متصل؛ آمار تونل پس از بازگشت نمایش داده می‌شود")
                         startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }
                 }.onFailure { setMessage(it.message ?: "اتصال ناموفق بود") } }
@@ -141,17 +143,30 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun StatusCard(status: TunnelStatus, message: String, disconnect: () -> Unit) {
+private fun StatusCard(status: TunnelStatus, telemetry: TunnelTelemetry, message: String, disconnect: () -> Unit) {
     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(when (status) { TunnelStatus.Down -> "آماده"; TunnelStatus.Connecting -> "در حال اتصال";
                     is TunnelStatus.Up -> "متصل"; is TunnelStatus.Error -> "خطای اتصال" }, fontWeight = FontWeight.Bold)
                 Text(message, style = MaterialTheme.typography.bodySmall)
+                if (status is TunnelStatus.Up) {
+                    val handshake = if (telemetry.latestHandshakeEpochMillis > 0) "Handshake برقرار" else "در انتظار Handshake"
+                    Text("$handshake · ↓ ${formatBytes(telemetry.rxBytes)} · ↑ ${formatBytes(telemetry.txBytes)}",
+                        style = MaterialTheme.typography.labelSmall)
+                    Text("DNS و MTU پنل بدون تغییر · ${telemetry.routedPackages} پکیج مجاز",
+                        style = MaterialTheme.typography.labelSmall)
+                }
             }
             if (status is TunnelStatus.Up) TextButton(onClick = disconnect) { Text("قطع") }
         }
     }
+}
+
+private fun formatBytes(value: Long): String = when {
+    value >= 1024 * 1024 -> "%.1f MB".format(value / (1024.0 * 1024.0))
+    value >= 1024 -> "%.1f KB".format(value / 1024.0)
+    else -> "$value B"
 }
 
 @Composable

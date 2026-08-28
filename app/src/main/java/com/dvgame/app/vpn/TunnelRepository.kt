@@ -8,8 +8,11 @@ import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,13 +21,20 @@ import java.io.ByteArrayInputStream
 
 private val PACKAGE_NAME_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
 
-/* Common game-side services used by Mobile Legends and Supercell titles.
- * Play Store and Download Manager are deliberately excluded so app updates and
- * arbitrary downloads can never consume the gaming tunnel. */
+/* Google identity and game-save services remain available for games that use
+ * Play Games sign-in. Play Store, Download Manager, browsers and social apps
+ * are deliberately excluded. */
 private val ESSENTIAL_GAME_SERVICES = listOf(
     "com.google.android.gms",
     "com.google.android.gsf",
     "com.google.android.play.games",
+)
+
+data class TunnelTelemetry(
+    val rxBytes: Long = 0,
+    val txBytes: Long = 0,
+    val latestHandshakeEpochMillis: Long = 0,
+    val routedPackages: Int = 0,
 )
 
 internal fun scopeConfigToPackages(raw: String, packageNames: Set<String>): String {
@@ -51,6 +61,9 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
     private val mutex = Mutex()
     private val mutableStatus = MutableStateFlow<TunnelStatus>(TunnelStatus.Down)
     val status = mutableStatus.asStateFlow()
+    private val mutableTelemetry = MutableStateFlow(TunnelTelemetry())
+    val telemetry = mutableTelemetry.asStateFlow()
+    private var telemetryJob: Job? = null
     private var activePackage: String? = null
     private val tunnel = object : Tunnel {
         override fun getName() = "dv-game"
@@ -71,21 +84,31 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
                 add(approvedPackage)
                 ESSENTIAL_GAME_SERVICES.filterTo(this) { isInstalled(it) }
             }
+            /* Only application routing is replaced. DNS, MTU, endpoint,
+             * AllowedIPs and keepalive remain byte-for-byte from the panel
+             * configuration so the server-side DNS lock keeps authority. */
             val scoped = scopeConfigToPackages(rawConfig, routedPackages)
             val parsed = Config.parse(ByteArrayInputStream(scoped.toByteArray(Charsets.UTF_8)))
             withContext(Dispatchers.IO) { backend.setState(tunnel, Tunnel.State.UP, parsed) }
             secureStore.save(rawConfig, approvedPackage, restoreValidUntilMs)
+            mutableTelemetry.value = TunnelTelemetry(routedPackages = routedPackages.size)
             mutableStatus.value = TunnelStatus.Up(approvedPackage)
+            startTelemetryMonitor(routedPackages.size)
         } catch (error: Throwable) {
+            telemetryJob?.cancel()
             activePackage = null
+            mutableTelemetry.value = TunnelTelemetry()
             mutableStatus.value = TunnelStatus.Error(messageFor(error))
             throw error
         }
     }
 
     suspend fun disconnect(forget: Boolean = false) = mutex.withLock {
+        telemetryJob?.cancel()
+        telemetryJob = null
         withContext(Dispatchers.IO) { backend.setState(tunnel, Tunnel.State.DOWN, null) }
         activePackage = null
+        mutableTelemetry.value = TunnelTelemetry()
         if (forget) secureStore.clear()
         mutableStatus.value = TunnelStatus.Down
     }
@@ -94,6 +117,27 @@ class TunnelRepository(private val context: Context, private val scope: Coroutin
         val saved = secureStore.load() ?: return
         runCatching { connect(saved.config, saved.packageName, saved.validUntilMs) }
             .onFailure { secureStore.clear() }
+    }
+
+    private fun startTelemetryMonitor(routedPackageCount: Int) {
+        telemetryJob?.cancel()
+        telemetryJob = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                runCatching {
+                    val stats = backend.getStatistics(tunnel)
+                    val latestHandshake = stats.peers().mapNotNull { key ->
+                        stats.peer(key)?.latestHandshakeEpochMillis()
+                    }.maxOrNull() ?: 0L
+                    TunnelTelemetry(
+                        rxBytes = stats.totalRx(),
+                        txBytes = stats.totalTx(),
+                        latestHandshakeEpochMillis = latestHandshake,
+                        routedPackages = routedPackageCount,
+                    )
+                }.onSuccess { mutableTelemetry.value = it }
+                delay(1_500)
+            }
+        }
     }
 
     private fun isInstalled(packageName: String): Boolean {

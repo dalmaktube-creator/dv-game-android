@@ -12,8 +12,8 @@ android {
         applicationId = "com.dvgame.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.0-alpha02"
+        versionCode = 4
+        versionName = "0.2.0-alpha03"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }

@@ -19,6 +19,17 @@ class TunnelRepositoryTest {
         assertEquals(1, result.lineSequence().count { it.startsWith("IncludedApplications") })
     }
 
+    @Test fun preservesPanelDnsMtuRoutesAndKeepaliveExactly() {
+        val raw = "[Interface]\nPrivateKey = x\nAddress = 10.10.0.2/32\nDNS = 10.20.0.2\nMTU = 1280\n\n[Peer]\nPublicKey = y\nAllowedIPs = 0.0.0.0/0, ::/0\nPersistentKeepalive = 25"
+        val result = scopeConfigToPackages(raw, setOf("com.mobile.legends", "com.google.android.gms"))
+        assertTrue(result.contains("DNS = 10.20.0.2"))
+        assertTrue(result.contains("MTU = 1280"))
+        assertTrue(result.contains("AllowedIPs = 0.0.0.0/0, ::/0"))
+        assertTrue(result.contains("PersistentKeepalive = 25"))
+        assertFalse(result.contains("DNS = 1.1.1.1"))
+        assertEquals(1, result.lineSequence().count { it.trimStart().startsWith("DNS =") })
+    }
+
     @Test fun keepsSinglePackageCompatibility() {
         val result = scopeConfigToPackage(
             "[Interface]\nPrivateKey=x\n[Peer]\nPublicKey=y", "com.tencent.ig")
