@@ -19,7 +19,11 @@ internal data class WireGuardCompatConfig(
 
 internal fun parseWireGuardCompatConfig(raw: String): WireGuardCompatConfig {
     require(raw.length <= 512 * 1024) { "کانفیگ بیش از حد بزرگ است" }
-    Config.parse(ByteArrayInputStream(raw.toByteArray(Charsets.UTF_8)))
+    val validationCopy = raw.lineSequence().filterNot {
+        val key = it.substringBefore('=').trim()
+        key.equals("IncludedApplications", true) || key.equals("ExcludedApplications", true)
+    }.joinToString("\n")
+    Config.parse(ByteArrayInputStream(validationCopy.toByteArray(Charsets.UTF_8)))
 
     var section = ""
     val interfaces = mutableListOf<MutableMap<String, String>>()
