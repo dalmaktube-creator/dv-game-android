@@ -20,7 +20,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 class DvVpnService : VpnService(), PlatformInterfaceImpl, CommandServerHandler {
@@ -68,7 +67,7 @@ class DvVpnService : VpnService(), PlatformInterfaceImpl, CommandServerHandler {
 
             val override = io.nekohasekai.libbox.OverrideOptions().apply {
                 if (packages.isNotEmpty()) {
-                    includePackage = StringIteratorImpl(packages.iterator())
+                    includePackage = StringIteratorImpl(packages.toList())
                 }
             }
             cs.startOrReloadService(config, override)
