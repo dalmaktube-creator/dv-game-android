@@ -2,12 +2,12 @@ name: android
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/app-v1]
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -27,13 +27,26 @@ jobs:
         run: |
           set -o pipefail
           gradle :app:assembleDebug --stacktrace 2>&1 | tee build.log
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha01-debug.apk
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: dv-game-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: DV-Game-0.2.0-alpha01-debug.apk
           if-no-files-found: error
           retention-days: 7
+      - name: Publish alpha release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create v0.2.0-alpha.1 \
+            DV-Game-0.2.0-alpha01-debug.apk \
+            --target "$GITHUB_SHA" \
+            --title "DV Game 0.2.0 Alpha 1" \
+            --prerelease \
+            --notes "نسخه آزمایشی داخلی برای تست نصب و اتصال روی Android 14. این نسخه Debug است و برای انتشار عمومی یا استفاده عملیاتی آماده نیست. بخش فعلی و قدیمی پنل WireGuard را تغییر نمی‌دهد."
       - name: Report failure diagnostics
         if: failure() && github.event_name == 'pull_request'
         env:
