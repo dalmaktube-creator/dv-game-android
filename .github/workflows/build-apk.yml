@@ -1,0 +1,46 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches: [agent/singbox-rebuild, main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.12'
+
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager "platforms;android-35" "build-tools;35.0.0" >/dev/null 2>&1 || true
+
+      - name: Download libbox AAR
+        run: |
+          mkdir -p app/libs
+          wget -q "https://github.com/proother/sing-box-lib/releases/download/v1.13.19/libbox-android.aar.zip"
+          unzip -o libbox-android.aar.zip -d /tmp/libbox-extract/
+          find /tmp/libbox-extract/ -name "*.aar" -exec cp {} app/libs/libbox.aar \;
+          rm -f libbox-android.aar.zip
+          echo "AAR size: $(du -h app/libs/libbox.aar)"
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon -x lint --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dv-game-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
