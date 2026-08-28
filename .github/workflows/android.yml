@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   build:
@@ -22,4 +23,21 @@ jobs:
         with:
           gradle-version: "8.10.2"
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        id: android-build
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --stacktrace 2>&1 | tee build.log
+      - name: Report failure diagnostics
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo '### Android build diagnostics'
+            echo '```text'
+            tail -n 180 build.log
+            echo '```'
+          } > build-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file build-comment.md
