@@ -2,15 +2,28 @@ name: android
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/app-v1]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   workflow_dispatch:
 
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   build:
+    # feat/app-v1 already builds on push; skip the duplicate PR synchronization job.
+    if: github.event_name != 'pull_request' || github.head_ref != 'feat/app-v1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,5 +34,93 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Download and verify pinned full libbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/libs /tmp/libbox
+          curl -fL --retry 3 -o /tmp/libbox.zip https://github.com/proother/sing-box-lib/releases/download/v1.13.19/libbox-android.aar.zip
+          echo "493bed8217b7c25d5699f964a7fcedd0d4d2d79abc72e4070a89709833b74f57  /tmp/libbox.zip" | sha256sum -c -
+          unzip -q /tmp/libbox.zip -d /tmp/libbox
+          AAR="$(find /tmp/libbox -name 'libbox.aar' -print -quit)"
+          test -n "$AAR"
+          cp "$AAR" app/libs/libbox.aar
+          unzip -p app/libs/libbox.aar classes.jar > /tmp/libbox-classes.jar
+          jar tf /tmp/libbox-classes.jar | grep -qx 'io/nekohasekai/libbox/CommandServer.class'
+          sha256sum app/libs/libbox.aar | tee libbox.sha256
+
+      - name: Restore stable Alpha signing key
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.DV_GAME_CI_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.DV_GAME_CI_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dv-game-ci-signing.p12"
+          keytool -list -keystore "$RUNNER_TEMP/dv-game-ci-signing.p12" -storepass "$KEYSTORE_PASSWORD" -alias dv-game-ci >/dev/null
+          echo "DV_GAME_KEYSTORE_PATH=$RUNNER_TEMP/dv-game-ci-signing.p12" >> "$GITHUB_ENV"
+          echo "DV_GAME_CI_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Test and build Alpha 11 debug APK
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha11-debug.apk
+
+      - name: Verify stable APK signature
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs DV-Game-0.2.0-alpha11-debug.apk | tee apk-signing.txt
+          grep -Eqi '^V[0-9.]+ Signer: certificate SHA-256 digest: 3f4a9eeb1bc8a7d6a4eac46ae5bcecd09ad61ec2d64e6363b4cc19aa64a85b1c$' apk-signing.txt
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dv-game-alpha11-debug-apk
+          path: |
+            DV-Game-0.2.0-alpha11-debug.apk
+            libbox.sha256
+            apk-signing.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish Alpha 11 release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.2.0-alpha.11 >/dev/null 2>&1; then
+            gh release upload v0.2.0-alpha.11 DV-Game-0.2.0-alpha11-debug.apk libbox.sha256 apk-signing.txt --clobber
+          else
+            gh release create v0.2.0-alpha.11 \
+              DV-Game-0.2.0-alpha11-debug.apk libbox.sha256 apk-signing.txt \
+              --target "$GITHUB_SHA" \
+              --title "DV Game 0.2.0 Alpha 11" \
+              --prerelease \
+              --notes "سخت‌سازی انتشار بدون تغییر مسیر پکت Alpha 10: درخواست runtime مجوز اعلان در Android 13+ و امضای ثابت Alpha APK با کنترل fingerprint در CI. برای نصب از Alpha 10 به Alpha 11 یک حذف نهایی لازم است؛ نسخه‌های بعدی با همین کلید قابل Upgrade خواهند بود."
+          fi
+
+      - name: Report failure diagnostics
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo '### Android build diagnostics'
+            echo '```text'
+            grep -nE '(^e: |error:|Unresolved reference|Compilation error|FAILED|FAILURE:|What went wrong|AssertionError)' build.log 2>/dev/null | tail -n 200 || true
+            echo '```'
+          } > build-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file build-comment.md
