@@ -33,8 +33,12 @@ data class DvSubscription(
 )
 
 sealed interface TunnelStatus {
-    data object Down : TunnelStatus
-    data object Connecting : TunnelStatus
-    data class Up(val packageName: String) : TunnelStatus
-    data class Error(val message: String) : TunnelStatus
+    data object Idle : TunnelStatus
+    data object Preparing : TunnelStatus
+    data object Starting : TunnelStatus
+    data class Connected(val packageName: String) : TunnelStatus
+    data class Reconnecting(val attempt: Int, val delayMs: Long, val reason: String) : TunnelStatus
+    data object Stopping : TunnelStatus
+    data class Blocked(val reason: String) : TunnelStatus
+    data class Failed(val message: String, val retryable: Boolean = true) : TunnelStatus
 }

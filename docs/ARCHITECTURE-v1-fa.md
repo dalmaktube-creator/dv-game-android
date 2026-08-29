@@ -1,28 +1,40 @@
-# معماری نسخه اولیه DV Game
+# معماری DV Game — مسیر Alpha 9
 
-## اصل سازگاری
+## اصل موتور
 
-DV Game موتور WireGuard را بازنویسی نمی‌کند. کتابخانه رسمی `com.wireguard.android:tunnel:1.0.20260102`، `GoBackend`، `VpnService` و parser رسمی کانفیگ استفاده می‌شوند. تفاوت محصول فقط در ورودی لینک‌محور و محدودکردن تونل به بازی‌های مورد تأیید پنل است.
+DV Game از `libbox` مبتنی بر sing-box برای TUN و endpoint WireGuard استفاده می‌کند. مسیر قدیمی `GoBackend` حذف شده و تنها یک موتور تولیدی وجود دارد. آرشیو libbox نسخه 1.13.19 با SHA-256 ثابت در CI کنترل می‌شود.
 
 ## جریان داده
 
-1. کاربر لینک HTTPS موجود `/sub/<id>` را وارد می‌کند.
-2. اپ همان لینک را با `format=dvgame` فراخوانی می‌کند.
-3. پنل پاسخ نسخه‌دار شامل وضعیت حساب، کانفیگ‌ها و کاتالوگ بازی می‌دهد.
-4. اپ برنامه‌های launchable گوشی را با packageهای کاتالوگ تقاطع می‌دهد.
-5. هیچ انتخاب دستی برنامه یا package name وجود ندارد.
-6. قبل از parse، هر Included/ExcludedApplications دریافتی حذف و فقط package بازی تأییدشده تزریق می‌شود.
-7. کانفیگ با AES/GCM و کلید Android Keystore رمز می‌شود.
-8. `GoBackend` تونل را برقرار می‌کند و سپس بازی اجرا می‌شود.
+1. کاربر لینک HTTPS اشتراک را وارد می‌کند.
+2. اپ پاسخ نسخه‌دار شامل وضعیت حساب، کانفیگ‌ها و کاتالوگ بازی را دریافت می‌کند.
+3. اپ برنامه‌های نصب‌شده را با packageهای کاتالوگ پنل تقاطع می‌دهد.
+4. کاربر بازی و سرور را انتخاب می‌کند.
+5. parser محلی ساختار تک Interface/Peer، کلیدها، IPv4، DNS، MTU و Endpoint را بررسی می‌کند.
+6. Endpoint قبل از ایجاد TUN روی شبکه فیزیکی resolve می‌شود؛ JSON نهایی فقط IPv4 عددی دارد.
+7. TUN فقط package بازی تأییدشده را include می‌کند.
+8. کانفیگ بازیابی با AES/GCM و کلید Android Keystore و اجاره محلی کوتاه ذخیره می‌شود.
+9. ماشین حالت، retry و handover شبکه چرخه عمر موتور را مدیریت می‌کنند.
+
+## مسیر پکت
+
+- TUN: `stack=mixed`، UDP روی gVisor، MTU حداکثر 1280، `udp_timeout=10m`.
+- Endpoint: WireGuard userspace، `workers=2`، تمام ترافیک بازی به `wg-game`.
+- DNS بازی: DNS عددی پنل با detour از `wg-game` و قانون `hijack-dns`.
+- سایر برنامه‌ها وارد TUN نمی‌شوند و اینترنت عادی دستگاه را حفظ می‌کنند.
+
+## پایداری شبکه
+
+- دامنه Endpoint در هر تلاش مجدداً resolve می‌شود.
+- A recordها روی تلاش‌های متوالی چرخانده می‌شوند.
+- keepalive روی Cellular حداکثر ۱۵ ثانیه و روی Wi-Fi/Ethernet حداکثر ۲۵ ثانیه است.
+- `registerDefaultNetworkCallback` و `setUnderlyingNetworks` تغییر Wi-Fi/Cellular را مدیریت می‌کنند.
+- دسترسی همگام به properties داخل `onAvailable` انجام نمی‌شود.
 
 ## مرز امنیتی
 
-این نسخه جلوی استفاده تصادفی از مرورگر و شبکه‌های اجتماعی را می‌گیرد. در دستگاه rootشده یا APK دست‌کاری‌شده تضمین مطلق وجود ندارد. مرحله بعد شامل device-bound key registration، Play Integrity، امضای نامتقارن catalog و تشخیص abuse در سرور است.
-
-## سازگاری پنل
-
-API جدید با wrapper افزوده می‌شود و ساخت Client، Subscription page، دانلود `.conf`، QR و استفاده در WireGuard رسمی تغییر نمی‌کنند.
+Game Split جلوی عبور تصادفی مرورگر و شبکه‌های اجتماعی از تونل را می‌گیرد. روی دستگاه rootشده یا APK دست‌کاری‌شده تضمین مطلق وجود ندارد. مراحل بعدی شامل device-bound key، امضای نامتقارن catalog، Play Integrity و تشخیص abuse سمت سرور است.
 
 ## محدودیت انتشار
 
-این شاخه Alpha است. پیش از Production باید handover شبکه، reboot/Always-on، lockdown، DNS/IPv6 leak، Doze و ماتریس OEM تست شود.
+این شاخه Alpha است. پیش از Production باید handover، reboot/Always-on، lockdown، DNS/IPv6 leak، Doze، NAT اپراتورهای ایران و ماتریس OEM روی دستگاه واقعی آزمایش شوند.

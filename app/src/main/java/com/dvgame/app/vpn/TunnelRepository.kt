@@ -2,13 +2,12 @@ package com.dvgame.app.vpn
 
 import android.content.Context
 import com.dvgame.app.model.TunnelStatus
-import com.wireguard.config.Config
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
-import java.io.ByteArrayInputStream
 
 private val PACKAGE_NAME_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
 
@@ -35,7 +34,7 @@ internal fun scopeConfigToPackages(raw: String, packageNames: Set<String>): Stri
     }.toMutableList()
     val interfaceIndexes = clean.indices.filter { clean[it].trim().equals("[Interface]", true) }
     require(interfaceIndexes.size == 1) { "ساختار Interface کانفیگ نامعتبر است" }
-    require(clean.count { it.trim().equals("[Peer]", true) } >= 1) { "بخش Peer در کانفیگ پیدا نشد" }
+    require(clean.count { it.trim().equals("[Peer]", true) } == 1) { "ساختار Peer کانفیگ نامعتبر است" }
     clean.add(interfaceIndexes.single() + 1, "IncludedApplications = ${packageNames.sorted().joinToString(", ")}")
     return clean.joinToString("\n")
 }
@@ -73,13 +72,24 @@ class TunnelRepository(private val context: Context, @Suppress("UNUSED_PARAMETER
     suspend fun connect(rawConfig: String, approvedPackage: String, restoreValidUntilMs: Long) {
         require(restoreValidUntilMs > System.currentTimeMillis()) { "اعتبار محلی اتصال پایان یافته است" }
         require(PACKAGE_NAME_PATTERN.matches(approvedPackage) && isInstalled(approvedPackage)) { "بازی تأییدشده روی گوشی نصب نیست" }
-        Config.parse(ByteArrayInputStream(rawConfig.toByteArray(Charsets.UTF_8)))
-        CompatibilityTunnelState.status.value = TunnelStatus.Connecting
+        parseWireGuardCompatConfig(rawConfig)
+        CompatibilityTunnelState.status.value = TunnelStatus.Preparing
         CompatibilityVpnService.connect(context, rawConfig, approvedPackage, restoreValidUntilMs)
-        val result = withTimeout(15_000) {
-            status.filter { it is TunnelStatus.Up || it is TunnelStatus.Error }.first()
+        val result = try {
+            withTimeout(90_000) {
+                status.filter {
+                    it is TunnelStatus.Connected || it is TunnelStatus.Blocked || it is TunnelStatus.Failed
+                }.first()
+            }
+        } catch (_: TimeoutCancellationException) {
+            CompatibilityVpnService.disconnect(context)
+            throw IllegalStateException("زمان برقراری اتصال بیش از حد طول کشید")
         }
-        if (result is TunnelStatus.Error) error(result.message)
+        when (result) {
+            is TunnelStatus.Blocked -> error(result.reason)
+            is TunnelStatus.Failed -> error(result.message)
+            else -> Unit
+        }
     }
 
     suspend fun disconnect(forget: Boolean = false) {

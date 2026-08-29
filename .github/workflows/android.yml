@@ -2,8 +2,14 @@ name: android
 
 on:
   push:
-    branches: [main, feat/app-v1, feat/libbox-game-engine]
+    branches: [main, feat/app-v1]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   workflow_dispatch:
 
 concurrency:
@@ -27,7 +33,7 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Download pinned full libbox with Clash API
+      - name: Download and verify pinned full libbox
         shell: bash
         run: |
           set -euo pipefail
@@ -38,41 +44,43 @@ jobs:
           AAR="$(find /tmp/libbox -name 'libbox.aar' -print -quit)"
           test -n "$AAR"
           cp "$AAR" app/libs/libbox.aar
+          unzip -p app/libs/libbox.aar classes.jar > /tmp/libbox-classes.jar
+          jar tf /tmp/libbox-classes.jar | grep -qx 'io/nekohasekai/libbox/CommandServer.class'
           sha256sum app/libs/libbox.aar | tee libbox.sha256
 
-      - name: Test and build Alpha 8 debug APK
+      - name: Test and build Alpha 9 debug APK
         shell: bash
         run: |
           set -o pipefail
           gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
-          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha08-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha09-debug.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: dv-game-alpha08-debug-apk
+          name: dv-game-alpha09-debug-apk
           path: |
-            DV-Game-0.2.0-alpha08-debug.apk
+            DV-Game-0.2.0-alpha09-debug.apk
             libbox.sha256
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Alpha 8 release
+      - name: Publish Alpha 9 release
         if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view v0.2.0-alpha.8 >/dev/null 2>&1; then
-            gh release upload v0.2.0-alpha.8 DV-Game-0.2.0-alpha08-debug.apk libbox.sha256 --clobber
+          if gh release view v0.2.0-alpha.9 >/dev/null 2>&1; then
+            gh release upload v0.2.0-alpha.9 DV-Game-0.2.0-alpha09-debug.apk libbox.sha256 --clobber
           else
-            gh release create v0.2.0-alpha.8 \
-              DV-Game-0.2.0-alpha08-debug.apk libbox.sha256 \
+            gh release create v0.2.0-alpha.9 \
+              DV-Game-0.2.0-alpha09-debug.apk libbox.sha256 \
               --target "$GITHUB_SHA" \
-              --title "DV Game 0.2.0 Alpha 8" \
+              --title "DV Game 0.2.0 Alpha 9" \
               --prerelease \
-              --notes "رفع بن‌بست DNS هنگام راه‌اندازی WireGuard: دامنه Endpoint قبل از ایجاد TUN و خارج از تونل به IPv4 تبدیل می‌شود؛ بنابراین lookup دیگر از wg-game عبور نمی‌کند. رفع Clash API نسخه Alpha 7 نیز حفظ شده است."
+              --notes "فاز ۰ و ۱: تثبیت Alpha 8، ماشین حالت اتصال، بازیابی با backoff، re-resolve و چرخش A record در هر تلاش، handover شبکه، keepalive امن برای NAT موبایل، دکمه قطع اعلان و حذف GoBackend قدیمی."
           fi
 
       - name: Report failure diagnostics

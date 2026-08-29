@@ -1,23 +1,28 @@
 # DV Game Android
 
-Android game-only VPN client controlled by the existing WG Gaming Panel.
+Android game-only VPN client controlled by WG Gaming Panel.
 
-## Alpha 6 data path
+## Alpha 9 data path
 
 ```text
 approved game package -> Android VpnService -> sing-tun mixed stack
-(system TCP + gVisor UDP) -> sing-box WireGuard endpoint -> existing Iran peer
--> existing panel-selected Pure Hysteria route/location
+(system TCP + gVisor UDP) -> sing-box/libbox WireGuard endpoint
+-> existing Iran peer -> panel-selected route/location
 ```
 
-Alpha 6 does not add a test location and does not change the panel, server tunnels, `/sub/`, QR codes, normal WireGuard configs, quota, expiry, or existing clients. It consumes the already-available `/dvgame/<token>` JSON and converts the same single-peer WireGuard profile locally on Android.
+Alpha 9 keeps the field-tested Alpha 8 packet path and adds a connection state machine, bounded exponential reconnect, endpoint re-resolution with A-record rotation, Android network handover, NAT-safe keepalive and deterministic cleanup. Only the package approved by the panel is admitted to Android's VPN; there is no arbitrary app picker.
 
-The failed Alpha 5 HEV -> SOCKS -> Xray chain has been removed. The replacement is one pinned upstream core (`sing-box/libbox` v1.13.19), one TUN, and one WireGuard endpoint. Only the package approved by the panel is admitted to Android's VPN. There is no arbitrary app picker.
+The previous HEV/Xray and WireGuard GoBackend paths have been removed. Production has one pinned engine: `libbox` v1.13.19. The release workflow verifies the upstream archive SHA-256 before every build.
 
-## First device test
+## Baseline and stability notes
 
-Use the existing personal client and any already-configured location. Validate subscription, connection, Mobile Legends loading, lobby, match start, UDP continuity, and panel RX/TX accounting on the Redmi Note 14 / Android 14.
+- `docs/BASELINE-alpha08-fa.md`: immutable identity and packet parameters of the successful Alpha 8 device test.
+- `docs/PHASE-1-STABILITY-fa.md`: state machine, reconnect, network handover and packet-quality acceptance criteria.
+
+## Device acceptance
+
+Validate subscription, Mobile Legends loading/lobby/match, Wi-Fi ↔ Cellular handover, idle NAT survival, panel RX/TX accounting and per-app leak isolation on Redmi Note 14 / Android 14. Browser and Speedtest must stay outside the tunnel.
 
 ## Licensing
 
-sing-box/libbox is built from the unmodified upstream v1.13.19 source in CI. Distribution must comply with its GPLv3 license; upstream source and exact build command are recorded in the workflow.
+The APK bundles the pinned `proother/sing-box-lib` v1.13.19 prebuilt AAR. Distribution and corresponding-source obligations must comply with GPLv3 before production release.

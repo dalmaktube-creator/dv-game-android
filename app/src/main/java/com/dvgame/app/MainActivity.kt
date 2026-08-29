@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
                     item { Text("بازی‌های مجاز نصب‌شده", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                     if (games.isEmpty()) item { Text("بازی‌های این بخش فقط توسط ادمین پنل تعیین می‌شوند.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     else items(games, key = { it.packageName }) { game ->
-                        GameCard(game, tunnelStatus !is TunnelStatus.Connecting) {
+                        GameCard(game, !tunnelStatus.isBusy()) {
                             connectAndLaunch(sub.account, sub.profiles[profileIndex], game) { message = it }
                         }
                     }
@@ -144,19 +144,40 @@ private fun StatusCard(status: TunnelStatus, telemetry: TunnelTelemetry, message
     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(when (status) { TunnelStatus.Down -> "آماده"; TunnelStatus.Connecting -> "در حال اتصال";
-                    is TunnelStatus.Up -> "متصل"; is TunnelStatus.Error -> "خطای اتصال" }, fontWeight = FontWeight.Bold)
-                Text(message, style = MaterialTheme.typography.bodySmall)
-                if (status is TunnelStatus.Up) {
+                Text(when (status) {
+                    TunnelStatus.Idle -> "آماده"
+                    TunnelStatus.Preparing -> "در حال آماده‌سازی"
+                    TunnelStatus.Starting -> "در حال راه‌اندازی"
+                    is TunnelStatus.Connected -> "متصل"
+                    is TunnelStatus.Reconnecting -> "در حال بازیابی اتصال"
+                    TunnelStatus.Stopping -> "در حال قطع"
+                    is TunnelStatus.Blocked -> "اتصال مجاز نیست"
+                    is TunnelStatus.Failed -> "خطای اتصال"
+                }, fontWeight = FontWeight.Bold)
+                Text(status.detailOr(message), style = MaterialTheme.typography.bodySmall)
+                if (status is TunnelStatus.Connected) {
                     Text("↓ ${formatBytes(telemetry.rxBytes)} · ↑ ${formatBytes(telemetry.txBytes)}",
                         style = MaterialTheme.typography.labelSmall)
                     Text("${telemetry.engineName} · DNS پنل · ${telemetry.routedPackages} پکیج مجاز",
                         style = MaterialTheme.typography.labelSmall)
                 }
             }
-            if (status is TunnelStatus.Up) TextButton(onClick = disconnect) { Text("قطع") }
+            if (status is TunnelStatus.Connected || status is TunnelStatus.Reconnecting) {
+                TextButton(onClick = disconnect) { Text("قطع") }
+            }
         }
     }
+}
+
+private fun TunnelStatus.isBusy(): Boolean =
+    this is TunnelStatus.Preparing || this is TunnelStatus.Starting ||
+        this is TunnelStatus.Reconnecting || this is TunnelStatus.Stopping
+
+private fun TunnelStatus.detailOr(fallback: String): String = when (this) {
+    is TunnelStatus.Reconnecting -> if (delayMs > 0) "$reason · تلاش بعدی تا ${delayMs / 1000.0} ثانیه" else reason
+    is TunnelStatus.Blocked -> reason
+    is TunnelStatus.Failed -> message
+    else -> fallback
 }
 
 private fun formatBytes(value: Long): String = when {

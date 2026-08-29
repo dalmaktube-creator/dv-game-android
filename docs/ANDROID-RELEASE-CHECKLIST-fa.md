@@ -19,7 +19,7 @@
 - [ ] مجوز `VpnService.prepare()` صحیح مدیریت می‌شود.
 - [ ] Connect/Disconnect روی Main Thread اجرا نمی‌شود.
 - [ ] Double tap دو اتصال هم‌زمان ایجاد نمی‌کند.
-- [ ] Service destruction فوراً State را DOWN می‌کند.
+- [ ] Service destruction فوراً State را `Idle` می‌کند.
 - [ ] یک بازی انتخاب‌شده از VPN عبور می‌کند.
 - [ ] Chrome، Telegram و اپ انتخاب‌نشده از VPN عبور نمی‌کنند.
 - [ ] فهرست خالی باعث Full-tunnel نمی‌شود.
@@ -49,14 +49,14 @@
 - [ ] HTTP عمومی پیش‌فرض خاموش است.
 - [ ] HTTPS→HTTP redirect رد می‌شود.
 - [ ] Response size، timeout و redirect count محدودند.
-- [ ] Config رسمی با `Config.parse()` اعتبارسنجی می‌شود.
+- [ ] parser محلی، sectionها، کلیدها، IPv4/CIDR، Endpoint، MTU و Keepalive را fail-closed اعتبارسنجی می‌کند.
 - [ ] Payload مخرب یا بسیار بزرگ fail-closed است.
 - [ ] Screenshot صفحه Secret مسدود است.
 - [ ] Open-source license notices داخل اپ وجود دارد.
 
 ## P1 — کیفیت
 
-- [ ] UI حالت‌های Connecting، Connected، Degraded و Error را جدا نمایش می‌دهد.
+- [ ] UI حالت‌های Preparing، Starting، Connected، Reconnecting، Blocked و Failed را جدا نمایش می‌دهد.
 - [ ] آخرین Handshake، RX و TX نمایش داده می‌شوند.
 - [ ] Polling آمار در Background متوقف می‌شود.
 - [ ] بازی‌های بدون CATEGORY_GAME با جست‌وجوی All apps قابل انتخاب‌اند.
