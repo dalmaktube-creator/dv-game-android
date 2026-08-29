@@ -12,8 +12,8 @@ android {
         applicationId = "com.dvgame.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.2.0-alpha09"
+        versionCode = 12
+        versionName = "0.2.0-alpha10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
     }
@@ -46,6 +46,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Kept temporarily for the battle-tested WireGuard config parser.
+    implementation("com.wireguard.android:tunnel:1.0.20260102")
     implementation(files("libs/libbox.aar"))
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation("junit:junit:4.13.2")

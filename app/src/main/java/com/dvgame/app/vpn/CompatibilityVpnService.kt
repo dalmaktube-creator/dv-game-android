@@ -49,6 +49,7 @@ import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.net.InterfaceAddress
 import java.net.NetworkInterface
+import java.util.concurrent.ConcurrentHashMap
 import io.nekohasekai.libbox.NetworkInterface as BoxNetworkInterface
 
 internal object CompatibilityTunnelState {
@@ -74,6 +75,7 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
     private var requestedConnection: ConnectionRequest? = null
     private var activePackage = ""
     private var boundNetwork: Network? = null
+    private val observedCapabilities = ConcurrentHashMap<Network, NetworkCapabilities>()
 
     override fun onCreate() {
         super.onCreate()
@@ -195,10 +197,14 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
 
     private fun requireUsableNetwork(): Network {
         val manager = getSystemService(ConnectivityManager::class.java)
-        val network = manager.activeNetwork ?: error("اتصال شبکه در دسترس نیست")
-        val capabilities = manager.getNetworkCapabilities(network) ?: error("اطلاعات اتصال شبکه در دسترس نیست")
-        check(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) { "اتصال شبکه اینترنت ندارد" }
-        return network
+        val candidates = buildList {
+            boundNetwork?.let(::add)
+            manager.activeNetwork?.let(::add)
+            addAll(manager.allNetworks)
+        }.distinct()
+        return candidates.firstOrNull { network ->
+            manager.getNetworkCapabilities(network)?.isUsableUnderlyingNetwork() == true
+        } ?: error("اتصال فیزیکی اینترنت در دسترس نیست")
     }
 
     private fun startEngine(config: String, packageName: String) {
@@ -323,16 +329,22 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
             }
 
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-                if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return
-                handleDefaultNetwork(network)
+                if (capabilities.isUsableUnderlyingNetwork()) {
+                    observedCapabilities[network] = capabilities
+                    handleDefaultNetwork(network)
+                } else {
+                    observedCapabilities.remove(network)
+                }
             }
 
             override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                if (observedCapabilities[network]?.isUsableUnderlyingNetwork() != true) return
                 reportDefaultInterface(listener, linkProperties)
                 handleDefaultNetwork(network)
             }
 
             override fun onLost(network: Network) {
+                observedCapabilities.remove(network)
                 if (network == boundNetwork) {
                     runCatching { setUnderlyingNetworks(null) }
                     scheduleNetworkReconnect("شبکه قطع یا تعویض شد")
@@ -341,7 +353,7 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
         }
         manager.registerDefaultNetworkCallback(callback)
         networkCallback = callback
-        manager.activeNetwork?.let { network ->
+        boundNetwork?.let { network ->
             manager.getLinkProperties(network)?.let { reportDefaultInterface(listener, it) }
         }
     }
@@ -367,6 +379,7 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
         }
         networkCallback = null
         defaultListener = null
+        observedCapabilities.clear()
     }
 
     override fun getInterfaces(): NetworkInterfaceIterator {
@@ -375,6 +388,7 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
         val values = manager.allNetworks.mapNotNull { network ->
             val properties = manager.getLinkProperties(network) ?: return@mapNotNull null
             val capabilities = manager.getNetworkCapabilities(network) ?: return@mapNotNull null
+            if (!capabilities.isUsableUnderlyingNetwork()) return@mapNotNull null
             val native = javaInterfaces.firstOrNull { it.name == properties.interfaceName } ?: return@mapNotNull null
             BoxNetworkInterface().apply {
                 name = native.name
@@ -397,6 +411,11 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
         }
         return InterfaceArray(values)
     }
+
+    private fun NetworkCapabilities.isUsableUnderlyingNetwork(): Boolean =
+        hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) &&
+            !hasTransport(NetworkCapabilities.TRANSPORT_VPN)
 
     private fun NetworkCapabilities.toTransport(): UnderlyingTransport = when {
         hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> UnderlyingTransport.CELLULAR

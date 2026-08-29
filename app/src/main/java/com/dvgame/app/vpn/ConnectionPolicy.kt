@@ -16,19 +16,18 @@ internal data class PacketPathOptions(
     }
 }
 
-internal fun effectiveKeepaliveSeconds(panelValue: Int, transport: UnderlyingTransport): Int {
-    require(panelValue in 0..65535) { "Keepalive نامعتبر است" }
-    val safeMaximum = when (transport) {
-        UnderlyingTransport.CELLULAR -> 15
-        UnderlyingTransport.WIFI, UnderlyingTransport.ETHERNET, UnderlyingTransport.OTHER -> 25
-    }
-    return if (panelValue == 0) safeMaximum else min(panelValue, safeMaximum)
-}
+internal fun effectiveKeepaliveSeconds(
+    panelValue: Int,
+    @Suppress("UNUSED_PARAMETER") transport: UnderlyingTransport,
+): Int = if (panelValue in 1..65535) panelValue else 25
 
-internal fun reconnectDelayMs(attempt: Int): Long {
+internal fun reconnectDelayMs(attempt: Int, jitterUnit: Double = Math.random()): Long {
     require(attempt >= 1)
+    require(jitterUnit in 0.0..1.0)
     val shift = (attempt - 1).coerceAtMost(4)
-    return min(1_000L shl shift, 15_000L)
+    val base = min(1_000L shl shift, 15_000L)
+    val jitterOffset = ((jitterUnit - 0.5) * 0.30 * base).toLong()
+    return (base + jitterOffset).coerceIn(500L, 15_000L)
 }
 
 internal fun selectEndpointAddress(addresses: List<String>, attempt: Int): String {

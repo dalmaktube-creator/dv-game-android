@@ -1,7 +1,9 @@
 package com.dvgame.app.vpn
 
+import com.wireguard.config.Config
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.net.IDN
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -22,6 +24,20 @@ internal data class WireGuardCompatConfig(
 internal fun parseWireGuardCompatConfig(raw: String): WireGuardCompatConfig {
     require(raw.isNotBlank()) { "کانفیگ خالی است" }
     require(raw.length <= 512 * 1024) { "کانفیگ بیش از حد بزرگ است" }
+    val validationCopy = raw.lineSequence().mapNotNull { line ->
+        val key = line.substringBefore('=').trim()
+        when {
+            key.equals("IncludedApplications", true) || key.equals("ExcludedApplications", true) -> null
+            key.equals("PersistentKeepalive", true) -> {
+                val value = line.substringAfter('=', "").substringBefore('#').trim().toIntOrNull()
+                if (value in 0..65535) line else "PersistentKeepalive = 0"
+            }
+            else -> line
+        }
+    }.joinToString("\n")
+    runCatching {
+        Config.parse(ByteArrayInputStream(validationCopy.toByteArray(Charsets.UTF_8)))
+    }.getOrElse { throw IllegalArgumentException("ساختار کانفیگ WireGuard نامعتبر است", it) }
 
     val interfaces = mutableListOf<MutableMap<String, String>>()
     val peers = mutableListOf<MutableMap<String, String>>()
@@ -68,8 +84,7 @@ internal fun parseWireGuardCompatConfig(raw: String): WireGuardCompatConfig {
 
     val mtu = intf["mtu"]?.toIntOrNull() ?: 1280
     require(mtu in 576..1500) { "MTU کانفیگ نامعتبر است" }
-    val keepalive = peer["persistentkeepalive"]?.toIntOrNull() ?: 0
-    require(keepalive in 0..65535) { "Keepalive کانفیگ نامعتبر است" }
+    val keepalive = peer["persistentkeepalive"]?.toIntOrNull()?.takeIf { it in 0..65535 } ?: 0
     val endpoint = peer["endpoint"].orEmpty().also {
         require(it.isNotBlank()) { "Endpoint پیدا نشد" }
         val (host, port) = splitEndpoint(it)

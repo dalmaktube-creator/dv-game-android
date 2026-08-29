@@ -7,20 +7,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConnectionPolicyTest {
-    @Test fun usesAggressiveNatSafeKeepaliveOnCellular() {
-        assertEquals(15, effectiveKeepaliveSeconds(0, UnderlyingTransport.CELLULAR))
-        assertEquals(15, effectiveKeepaliveSeconds(25, UnderlyingTransport.CELLULAR))
-        assertEquals(10, effectiveKeepaliveSeconds(10, UnderlyingTransport.CELLULAR))
+    @Test fun preservesEveryValidPanelKeepalive() {
+        assertEquals(1, effectiveKeepaliveSeconds(1, UnderlyingTransport.CELLULAR))
+        assertEquals(25, effectiveKeepaliveSeconds(25, UnderlyingTransport.CELLULAR))
+        assertEquals(60, effectiveKeepaliveSeconds(60, UnderlyingTransport.WIFI))
+        assertEquals(65_535, effectiveKeepaliveSeconds(65_535, UnderlyingTransport.OTHER))
     }
 
-    @Test fun usesStandardKeepaliveOnWifi() {
-        assertEquals(25, effectiveKeepaliveSeconds(0, UnderlyingTransport.WIFI))
-        assertEquals(25, effectiveKeepaliveSeconds(60, UnderlyingTransport.WIFI))
+    @Test fun fallsBackOnlyForMissingOrInvalidKeepalive() {
+        assertEquals(25, effectiveKeepaliveSeconds(0, UnderlyingTransport.CELLULAR))
+        assertEquals(25, effectiveKeepaliveSeconds(-1, UnderlyingTransport.WIFI))
+        assertEquals(25, effectiveKeepaliveSeconds(65_536, UnderlyingTransport.ETHERNET))
     }
 
-    @Test fun reconnectBackoffIsBounded() {
+    @Test fun reconnectBackoffIsBoundedAndSupportsJitter() {
         assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 15_000L, 15_000L),
-            (1..6).map(::reconnectDelayMs))
+            (1..6).map { reconnectDelayMs(it, jitterUnit = 0.5) })
+        assertTrue(reconnectDelayMs(1, jitterUnit = 0.0) < reconnectDelayMs(1, jitterUnit = 1.0))
+        assertTrue(reconnectDelayMs(10, jitterUnit = 1.0) <= 15_000L)
     }
 
     @Test fun rotatesAllResolvedARecords() {

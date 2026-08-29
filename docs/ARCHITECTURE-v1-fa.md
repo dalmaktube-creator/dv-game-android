@@ -1,8 +1,8 @@
-# معماری DV Game — مسیر Alpha 9
+# معماری DV Game — مسیر Alpha 10
 
 ## اصل موتور
 
-DV Game از `libbox` مبتنی بر sing-box برای TUN و endpoint WireGuard استفاده می‌کند. مسیر قدیمی `GoBackend` حذف شده و تنها یک موتور تولیدی وجود دارد. آرشیو libbox نسخه 1.13.19 با SHA-256 ثابت در CI کنترل می‌شود.
+DV Game از `libbox` مبتنی بر sing-box برای TUN و endpoint WireGuard استفاده می‌کند. مسیر اجرایی قدیمی `GoBackend` حذف شده و تنها یک موتور تولیدی وجود دارد؛ وابستگی WireGuard Android موقتاً فقط برای parser رسمی کانفیگ حفظ شده است. آرشیو libbox نسخه 1.13.19 با SHA-256 ثابت در CI کنترل می‌شود.
 
 ## جریان داده
 
@@ -27,8 +27,8 @@ DV Game از `libbox` مبتنی بر sing-box برای TUN و endpoint WireGuar
 
 - دامنه Endpoint در هر تلاش مجدداً resolve می‌شود.
 - A recordها روی تلاش‌های متوالی چرخانده می‌شوند.
-- keepalive روی Cellular حداکثر ۱۵ ثانیه و روی Wi-Fi/Ethernet حداکثر ۲۵ ثانیه است.
-- `registerDefaultNetworkCallback` و `setUnderlyingNetworks` تغییر Wi-Fi/Cellular را مدیریت می‌کنند.
+- Keepalive معتبر پنل بدون تغییر حفظ می‌شود؛ فقط صفر یا مقدار نامعتبر fallback کنترل‌شده می‌گیرد.
+- `registerDefaultNetworkCallback` و `setUnderlyingNetworks` تغییر Wi-Fi/Cellular را مدیریت می‌کنند و شبکه دارای `TRANSPORT_VPN` هرگز underlying محسوب نمی‌شود.
 - دسترسی همگام به properties داخل `onAvailable` انجام نمی‌شود.
 
 ## مرز امنیتی

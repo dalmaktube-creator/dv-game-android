@@ -1,13 +1,13 @@
-# گزارش بازبینی Alpha 9 — فازهای ۰ و ۱
+# گزارش بازبینی Alpha 10 — فازهای ۰ و ۱ و Hotfix چرخه شبکه
 
 ## انجام‌شده در محیط محلی
 
 - تطبیق دو آرشیو `0.2.0-alpha.8` و `feat/app-v1`: هر دو ۲۹ فایل و بدون اختلاف بودند.
 - کنترل نسخه ورودی: `versionCode=10` و `versionName=0.2.0-alpha08`.
 - اسکن تعادل delimiterهای ۱۸ فایل Kotlin.
-- کنترل نبود وابستگی و importهای GoBackend/WireGuard Android در کد تولید.
+- کنترل نبود مسیر اجرایی GoBackend؛ parser رسمی WireGuard موقتاً حفظ شده است.
 - کنترل نبود statusهای منسوخ در کد.
-- parse فایل GitHub Actions و کنترل trigger خودکار، hash ثابت libbox و tag Alpha 9.
+- parse فایل GitHub Actions و کنترل trigger خودکار، جلوگیری از job تکراری PR، hash ثابت libbox و tag Alpha 10.
 - کنترل ۳۲ بایتی بودن کلیدهای تست.
 - کنترل نبود الگوی token/private key واقعی خارج از تست و مستندات.
 - کنترل whitespace روی diff.
@@ -27,7 +27,7 @@
 
 ## محدودیت این گزارش
 
-محیط محلی Android SDK، Gradle و AAR libbox ندارد؛ بنابراین build واقعی در این محیط اجرا نشد. اولین push کد باید GitHub Actions را اجرا کند و فقط پس از سبزشدن `testDebugUnitTest` و `assembleDebug`، APK Alpha 9 برای تست گوشی استفاده شود.
+محیط محلی Android SDK، Gradle و AAR libbox ندارد؛ بنابراین build واقعی در این محیط اجرا نشد. اولین push کد باید GitHub Actions را اجرا کند و فقط پس از سبزشدن `testDebugUnitTest` و `assembleDebug`، APK Alpha 10 برای تست گوشی استفاده شود.
 
 ## آزمون الزامی گوشی
 
