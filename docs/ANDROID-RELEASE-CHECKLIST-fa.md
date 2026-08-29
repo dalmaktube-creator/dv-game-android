@@ -7,7 +7,7 @@
 - [ ] Debug APK در CI ساخته می‌شود.
 - [ ] Release AAB با کلید واقعی و امن ساخته می‌شود.
 - [ ] نصب تمیز روی Android 8، 10، 12، 14، 15 و 16 آزمایش شده است.
-- [ ] Upgrade از نسخه قبلی بدون حذف داده آزمایش شده است.
+- [ ] Upgrade از Alpha 11 به نسخه بعدی بدون حذف داده و با fingerprint ثابت آزمایش شده است.
 - [ ] `arm64-v8a` و ABIهای هدف داخل Bundle وجود دارند.
 - [ ] native libraryها با دستگاه 16 KB page سازگارند.
 - [ ] Manifest merged بررسی شده و VPN Service `exported=false` است.
@@ -88,6 +88,8 @@
 ## انتشار
 
 - [ ] versionCode افزایشی است.
+- [ ] مجوز runtime اعلان روی Android 13+ درخواست می‌شود و دکمه قطع Foreground Service دیده می‌شود.
+- [ ] fingerprint امضای Alpha در CI با مقدار ثبت‌شده کنترل می‌شود.
 - [ ] Release notes دقیق است.
 - [ ] Privacy Policy و Play Data Safety تکمیل شده‌اند.
 - [ ] Crash reporting هیچ Secretی جمع نمی‌کند.

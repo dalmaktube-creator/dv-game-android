@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val ciKeystorePath = providers.environmentVariable("DV_GAME_KEYSTORE_PATH").orNull
+val ciKeystorePassword = providers.environmentVariable("DV_GAME_CI_KEYSTORE_PASSWORD").orNull
+
 android {
     namespace = "com.dvgame.app"
     compileSdk = 35
@@ -12,13 +15,29 @@ android {
         applicationId = "com.dvgame.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.2.0-alpha10"
+        versionCode = 13
+        versionName = "0.2.0-alpha11"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
     }
     buildFeatures { compose = true; buildConfig = true }
+    signingConfigs {
+        if (!ciKeystorePath.isNullOrBlank() && !ciKeystorePassword.isNullOrBlank()) {
+            create("ci") {
+                storeFile = file(ciKeystorePath!!)
+                storePassword = ciKeystorePassword!!
+                keyAlias = "dv-game-ci"
+                keyPassword = ciKeystorePassword
+                storeType = "PKCS12"
+            }
+        }
+    }
     buildTypes {
+        getByName("debug") {
+            if (!ciKeystorePath.isNullOrBlank() && !ciKeystorePassword.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("ci")
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
