@@ -3,6 +3,7 @@ package com.dvgame.app
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.dvgame.app.data.SelectionStore
 import com.dvgame.app.data.SubscriptionRepository
 import com.dvgame.app.data.SubscriptionSnapshot
 import com.dvgame.app.model.AppScreen
@@ -11,12 +12,15 @@ import com.dvgame.app.model.DvSubscription
 import com.dvgame.app.model.InstalledGame
 import com.dvgame.app.model.ServerProfile
 import com.dvgame.app.model.TunnelStatus
+import com.dvgame.app.update.UpdateManifest
+import com.dvgame.app.update.UpdateService
 import com.dvgame.app.vpn.TunnelRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class AppUiState(
     val screen: AppScreen = AppScreen.HOME,
@@ -29,13 +33,18 @@ data class AppUiState(
     val loading: Boolean = true,
     val fromCache: Boolean = false,
     val message: String = "در حال آماده‌سازی…",
+    val mirrorUrl: String = "",
+    val updateStatus: String = "",
+    val availableUpdate: UpdateManifest? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val subscriptions = SubscriptionRepository(application)
     private val tunnel: TunnelRepository = (application as DvGameApplication).tunnelRepository
+    private val store = SelectionStore(application)
+    private val updates = UpdateService(application)
     private val mutableUi = MutableStateFlow(
-        AppUiState(link = subscriptions.savedLink(), autoLaunch = subscriptions.autoLaunchGame())
+        AppUiState(link = subscriptions.savedLink(), autoLaunch = subscriptions.autoLaunchGame(), mirrorUrl = store.loadUpdateMirrorUrl())
     )
     val ui: StateFlow<AppUiState> = mutableUi.asStateFlow()
     val tunnelStatus = tunnel.status
@@ -121,6 +130,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun report(message: String) = mutableUi.update { it.copy(message = message) }
 
+    fun setMirrorUrl(value: String) {
+        val trimmed = value.trim()
+        mutableUi.update { it.copy(mirrorUrl = trimmed) }
+        store.saveUpdateMirrorUrl(trimmed)
+    }
+
+    fun checkForUpdate() = viewModelScope.launch {
+        mutableUi.update { it.copy(updateStatus = "در حال بررسی نسخه جدید…", availableUpdate = null) }
+        runCatching { updates.check(manifestSources()) }
+            .onSuccess { manifest -> mutableUi.update { state ->
+                val newer = manifest.isNewerThan(updates.currentVersionCode())
+                state.copy(
+                    availableUpdate = if (newer) manifest else null,
+                    updateStatus = if (newer) "نسخه ${manifest.versionName} آماده نصب است" else "برنامه به‌روز است",
+                )
+            } }
+            .onFailure { error -> mutableUi.update { it.copy(updateStatus = friendlyError(error)) } }
+    }
+
+    suspend fun downloadUpdate(manifest: UpdateManifest): File {
+        mutableUi.update { it.copy(updateStatus = "در حال دانلود نسخه ${manifest.versionName}…") }
+        return runCatching { updates.download(manifest) }
+            .onSuccess { mutableUi.update { state -> state.copy(updateStatus = "فایل بررسی شد؛ نصب را تأیید کنید") } }
+            .onFailure { error -> mutableUi.update { state -> state.copy(updateStatus = friendlyError(error)) } }
+            .getOrThrow()
+    }
+
+    fun canInstallUpdates(): Boolean = updates.canInstall()
+
+    private fun manifestSources(): List<String> = buildList {
+        add(GITHUB_UPDATE_MANIFEST)
+        val mirror = mutableUi.value.mirrorUrl
+        if (UpdateManifest.isHttps(mirror)) add(mirror)
+    }
+
     private fun applySnapshot(snapshot: SubscriptionSnapshot, message: String) {
         val old = mutableUi.value
         val game = snapshot.installedGames.firstOrNull { it.packageName == subscriptions.lastGamePackage() }
@@ -153,9 +197,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return null
     }
 
-    private fun friendlyError(error: Throwable): String = when {
-        error.message?.contains("timed out", true) == true -> "سرور پاسخ نداد؛ دوباره تلاش کنید"
-        error.message?.contains("Unable to resolve", true) == true -> "اتصال اینترنت یا DNS را بررسی کنید"
-        else -> error.message ?: "خطای ناشناخته رخ داد"
+    private fun friendlyError(error: Throwable): String {
+        val text = error.message.orEmpty()
+        return when {
+            text.contains("timed out", true) || text.contains("timeout", true) ->
+                "سرور پاسخ نداد؛ دوباره تلاش کنید"
+            text.contains("Unable to resolve", true) || text.contains("UnknownHost", true) ->
+                "اتصال اینترنت یا DNS را بررسی کنید"
+            text.contains("SSL", true) || text.contains("trust anchor", true) ->
+                "ارتباط امن برقرار نشد؛ ساعت و شبکه دستگاه را بررسی کنید"
+            text.contains("401") || text.contains("403") ->
+                "لینک اشتراک معتبر نیست یا دسترسی ندارد"
+            text.contains("404") ->
+                "آدرس درخواستی پیدا نشد"
+            text.contains("500") || text.contains("502") || text.contains("503") ->
+                "سرور موقتاً در دسترس نیست؛ کمی بعد دوباره تلاش کنید"
+            text.contains("apiVersion", true) || text.contains("JSON", true) ->
+                "پاسخ سرور قابل خواندن نبود؛ نسخه برنامه یا پنل را بررسی کنید"
+            text.isBlank() -> "خطای ناشناخته رخ داد"
+            else -> text
+        }
+    }
+
+    companion object {
+        const val GITHUB_UPDATE_MANIFEST =
+            "https://github.com/dalmaktube-creator/dv-game-android/releases/latest/download/dv-game-update.json"
     }
 }
