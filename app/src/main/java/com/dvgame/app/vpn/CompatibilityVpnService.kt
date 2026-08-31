@@ -521,7 +521,7 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
         private const val EXTRA_VALID_UNTIL = "validUntil"
         private const val CHANNEL_ID = "dv_game_tunnel"
         private const val NOTIFICATION_ID = 201
-        private const val MAX_CONNECT_ATTEMPTS = 5
+        private const val MAX_CONNECT_ATTEMPTS = 2
         private const val ENGINE_START_TIMEOUT_MS = 15_000L
         private const val NETWORK_DEBOUNCE_MS = 750L
 

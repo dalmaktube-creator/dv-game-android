@@ -82,7 +82,7 @@ class TunnelRepository(private val context: Context, @Suppress("UNUSED_PARAMETER
         CompatibilityTunnelState.status.value = TunnelStatus.Preparing
         CompatibilityVpnService.connect(context, rawConfig, approvedPackage, restoreValidUntilMs)
         val result = try {
-            withTimeout(90_000) {
+            withTimeout(30_000) {
                 status.filter {
                     it is TunnelStatus.Connected || it is TunnelStatus.Blocked || it is TunnelStatus.Failed
                 }.first()
