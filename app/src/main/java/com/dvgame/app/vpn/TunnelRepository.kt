@@ -7,7 +7,10 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 private val PACKAGE_NAME_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
 
@@ -69,10 +72,13 @@ class TunnelRepository(private val context: Context, @Suppress("UNUSED_PARAMETER
     val status = CompatibilityTunnelState.status.asStateFlow()
     val telemetry = CompatibilityTunnelState.telemetry.asStateFlow()
 
-    suspend fun connect(rawConfig: String, approvedPackage: String, restoreValidUntilMs: Long) {
+    private val gate = Mutex()
+
+    suspend fun connect(rawConfig: String, approvedPackage: String, restoreValidUntilMs: Long) = gate.withLock {
         require(restoreValidUntilMs > System.currentTimeMillis()) { "اعتبار محلی اتصال پایان یافته است" }
         require(PACKAGE_NAME_PATTERN.matches(approvedPackage) && isInstalled(approvedPackage)) { "بازی تأییدشده روی گوشی نصب نیست" }
         parseWireGuardCompatConfig(rawConfig)
+        ensureFullyStopped()
         CompatibilityTunnelState.status.value = TunnelStatus.Preparing
         CompatibilityVpnService.connect(context, rawConfig, approvedPackage, restoreValidUntilMs)
         val result = try {
@@ -93,8 +99,19 @@ class TunnelRepository(private val context: Context, @Suppress("UNUSED_PARAMETER
     }
 
     suspend fun disconnect(forget: Boolean = false) {
-        if (forget) SecureTunnelStore(context).clear()
+        gate.withLock {
+            if (forget) SecureTunnelStore(context).clear()
+            CompatibilityVpnService.disconnect(context)
+            withTimeoutOrNull(6_000) { status.filter { it is TunnelStatus.Idle }.first() }
+        }
+    }
+
+    private suspend fun ensureFullyStopped() {
+        if (status.value is TunnelStatus.Idle) return
         CompatibilityVpnService.disconnect(context)
+        if (withTimeoutOrNull(6_000) { status.filter { it is TunnelStatus.Idle }.first() } == null) {
+            CompatibilityTunnelState.status.value = TunnelStatus.Idle
+        }
     }
 
     private fun isInstalled(packageName: String) = runCatching {
