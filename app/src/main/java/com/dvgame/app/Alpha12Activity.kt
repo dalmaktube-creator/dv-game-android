@@ -102,7 +102,7 @@ class Alpha12Activity : ComponentActivity() {
 
     private fun startSelected() {
         val choice = model.connectionChoice() ?: return
-        val action = { connect(choice) }
+        val action: () -> Unit = { connect(choice); Unit }
         val permission = VpnService.prepare(this)
         if (permission == null) action() else {
             afterVpnPermission = action
