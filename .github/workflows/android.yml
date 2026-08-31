@@ -11,6 +11,12 @@ on:
       - "docs/**"
       - "**/*.md"
   workflow_dispatch:
+    inputs:
+      publish_alpha12:
+        description: "Publish the Alpha 12 release (explicit approval only)"
+        required: false
+        default: "false"
+        type: string
 
 concurrency:
   group: android-${{ github.ref }}
@@ -65,12 +71,28 @@ jobs:
           echo "DV_GAME_KEYSTORE_PATH=$RUNNER_TEMP/dv-game-ci-signing.p12" >> "$GITHUB_ENV"
           echo "DV_GAME_CI_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
 
-      - name: Test and build Alpha 11 debug APK
+      - name: Test and build Alpha 12 debug APK
         shell: bash
         run: |
           set -o pipefail
           gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee build.log
-          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha11-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DV-Game-0.2.0-alpha12-debug.apk
+          sha256sum DV-Game-0.2.0-alpha12-debug.apk | awk '{ print $1 }' > DV-Game-0.2.0-alpha12-debug.apk.sha256
+          APK_SHA256="$(cat DV-Game-0.2.0-alpha12-debug.apk.sha256)"
+          VERSION_CODE="$(grep -oE 'versionCode = [0-9]+' app/build.gradle.kts | head -n 1 | grep -oE '[0-9]+')"
+          VERSION_NAME="$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | head -n 1 | cut -d '"' -f 2)"
+          cat > dv-game-update.json <<JSON
+          {
+            "versionCode": $VERSION_CODE,
+            "versionName": "$VERSION_NAME",
+            "packageName": "com.dvgame.app",
+            "sha256": "$APK_SHA256",
+            "signatureSha256": "3f4a9eeb1bc8a7d6a4eac46ae5bcecd09ad61ec2d64e6363b4cc19aa64a85b1c",
+            "primaryUrl": "https://github.com/dalmaktube-creator/dv-game-android/releases/latest/download/DV-Game-0.2.0-alpha12-debug.apk",
+            "mirrorUrl": "",
+            "notes": "DV Game 0.2.0 Alpha 12"
+          }
+          JSON
 
       - name: Verify stable APK signature
         if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
@@ -79,36 +101,38 @@ jobs:
           set -euo pipefail
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs DV-Game-0.2.0-alpha11-debug.apk | tee apk-signing.txt
+          "$APKSIGNER" verify --verbose --print-certs DV-Game-0.2.0-alpha12-debug.apk | tee apk-signing.txt
           grep -Eqi '^V[0-9.]+ Signer: certificate SHA-256 digest: 3f4a9eeb1bc8a7d6a4eac46ae5bcecd09ad61ec2d64e6363b4cc19aa64a85b1c$' apk-signing.txt
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: dv-game-alpha11-debug-apk
+          name: dv-game-alpha12-debug-apk
           path: |
-            DV-Game-0.2.0-alpha11-debug.apk
+            DV-Game-0.2.0-alpha12-debug.apk
+            DV-Game-0.2.0-alpha12-debug.apk.sha256
+            dv-game-update.json
             libbox.sha256
             apk-signing.txt
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Alpha 11 release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
+      - name: Publish Alpha 12 release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_alpha12 == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view v0.2.0-alpha.11 >/dev/null 2>&1; then
-            gh release upload v0.2.0-alpha.11 DV-Game-0.2.0-alpha11-debug.apk libbox.sha256 apk-signing.txt --clobber
+          ASSETS="DV-Game-0.2.0-alpha12-debug.apk DV-Game-0.2.0-alpha12-debug.apk.sha256 dv-game-update.json libbox.sha256 apk-signing.txt"
+          if gh release view v0.2.0-alpha.12 >/dev/null 2>&1; then
+            gh release upload v0.2.0-alpha.12 $ASSETS --clobber
           else
-            gh release create v0.2.0-alpha.11 \
-              DV-Game-0.2.0-alpha11-debug.apk libbox.sha256 apk-signing.txt \
+            gh release create v0.2.0-alpha.12 $ASSETS \
               --target "$GITHUB_SHA" \
-              --title "DV Game 0.2.0 Alpha 11" \
+              --title "DV Game 0.2.0 Alpha 12" \
               --prerelease \
-              --notes "سخت‌سازی انتشار بدون تغییر مسیر پکت Alpha 10: درخواست runtime مجوز اعلان در Android 13+ و امضای ثابت Alpha APK با کنترل fingerprint در CI. برای نصب از Alpha 10 به Alpha 11 یک حذف نهایی لازم است؛ نسخه‌های بعدی با همین کلید قابل Upgrade خواهند بود."
+              --notes "به‌روزرسانی امن درون‌برنامه‌ای با منبع اول GitHub و نشانی جایگزین؛ تجربه سه‌بخشی جدید و پیام‌های خطای دقیق. سرور گیمینگ هیچ‌گاه فایل نصبی ارائه نمی‌کند."
           fi
 
       - name: Report failure diagnostics
