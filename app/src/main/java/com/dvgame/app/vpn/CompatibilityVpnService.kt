@@ -109,7 +109,15 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
         connectionJob?.cancel()
         reconnectJob?.cancel()
         connectionJob = scope.launch {
-            operationMutex.withLock { connectWithRetry(request, reconnect) }
+            try {
+                operationMutex.withLock { connectWithRetry(request, reconnect) }
+            } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
+                val current = CompatibilityTunnelState.status.value
+                if (current is TunnelStatus.Preparing || current is TunnelStatus.Starting || current is TunnelStatus.Reconnecting) {
+                    CompatibilityTunnelState.status.value = TunnelStatus.Idle
+                }
+                throw cancellation
+            }
         }
     }
 
