@@ -65,6 +65,8 @@ import com.dvgame.app.model.InstalledGame
 import com.dvgame.app.model.ServerProfile
 import com.dvgame.app.model.TunnelStatus
 import com.dvgame.app.ui.DvTheme
+import com.dvgame.app.update.UpdateManifest
+import com.dvgame.app.update.UpdateService
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -87,7 +89,7 @@ class Alpha12Activity : ComponentActivity() {
             DvTheme {
                 val ui by model.ui.collectAsState()
                 val status by model.tunnelStatus.collectAsState()
-                Alpha12App(ui, status, model, ::startSelected)
+                Alpha12App(ui, status, model, ::startSelected, ::installUpdate)
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -121,11 +123,24 @@ class Alpha12Activity : ComponentActivity() {
             }
             .onFailure { model.report(it.message ?: "اتصال ناموفق بود") }
     }
+
+    private fun installUpdate(manifest: UpdateManifest) {
+        if (!model.canInstallUpdates()) {
+            model.report("برای نصب، اجازه نصب از این منبع را در تنظیمات اندروید فعال کنید")
+            startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            return
+        }
+        lifecycleScope.launch {
+            runCatching { model.downloadUpdate(manifest) }
+                .onSuccess { file -> startActivity(UpdateService(this@Alpha12Activity).installIntent(file)) }
+                .onFailure { model.report(it.message ?: "نصب به‌روزرسانی ناموفق بود") }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Alpha12App(ui: AppUiState, status: TunnelStatus, model: MainViewModel, connect: () -> Unit) {
+private fun Alpha12App(ui: AppUiState, status: TunnelStatus, model: MainViewModel, connect: () -> Unit, install: (UpdateManifest) -> Unit) {
     Scaffold(
         topBar = { TopAppBar(title = { Column { Text("DV Game", fontWeight = FontWeight.Bold); Text(ui.message, style = MaterialTheme.typography.labelSmall) } }) },
         bottomBar = {
@@ -139,7 +154,7 @@ private fun Alpha12App(ui: AppUiState, status: TunnelStatus, model: MainViewMode
         when (ui.screen) {
             AppScreen.HOME -> Home(ui, status, model, connect, padding)
             AppScreen.ACCOUNT -> Account(ui, padding)
-            AppScreen.SETTINGS -> Settings(ui, model, padding)
+            AppScreen.SETTINGS -> Settings(ui, model, install, padding)
         }
     }
 }
@@ -253,15 +268,19 @@ private fun Account(ui: AppUiState, padding: PaddingValues) {
 }
 
 @Composable
-private fun Settings(ui: AppUiState, model: MainViewModel, padding: PaddingValues) {
+private fun Settings(ui: AppUiState, model: MainViewModel, install: (UpdateManifest) -> Unit, padding: PaddingValues) {
     val context = LocalContext.current
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text("تنظیمات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         item { OutlinedTextField(ui.link, model::setLink, Modifier.fillMaxWidth(), label = { Text("لینک HTTPS اشتراک") }, singleLine = true) }
         item { Button({ model.refresh() }, enabled = ui.link.isNotBlank() && !ui.loading, modifier = Modifier.fillMaxWidth()) { Text("دریافت و بررسی لینک") } }
         item { HorizontalDivider() }
+        item { OutlinedTextField(ui.mirrorUrl, model::setMirrorUrl, Modifier.fillMaxWidth(), label = { Text("نشانی جایگزین به‌روزرسانی (اختیاری)") }, singleLine = true) }
+        item { Button({ model.checkForUpdate() }, Modifier.fillMaxWidth()) { Text("بررسی به‌روزرسانی") } }
+        ui.availableUpdate?.let { manifest -> item { Button({ install(manifest) }, Modifier.fillMaxWidth()) { Text("دانلود و نصب نسخه ${manifest.versionName}") } } }
+        if (ui.updateStatus.isNotBlank()) item { Text(ui.updateStatus, style = MaterialTheme.typography.bodySmall) }
         item { OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dalmaktube-creator/dv-game-android/releases"))) }, Modifier.fillMaxWidth()) { Text("بررسی نسخه‌های منتشرشده") } }
-        item { Text("منبع اصلی نسخه‌ها GitHub Release است؛ سرور گیمینگ فایل APK ارائه نمی‌کند.", style = MaterialTheme.typography.bodySmall) }
+        item { Text("منبع اول GitHub Release است؛ اگر در دسترس نبود از نشانی جایگزین استفاده می‌شود. سرور گیمینگ هرگز فایل نصبی نمی‌دهد.", style = MaterialTheme.typography.bodySmall) }
         item { OutlinedButton(model::reset, Modifier.fillMaxWidth()) { Text("پاک‌کردن کامل اطلاعات") } }
         item { Text("نسخه ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium) }
     }
