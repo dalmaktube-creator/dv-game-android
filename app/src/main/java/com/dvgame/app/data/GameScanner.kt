@@ -3,6 +3,7 @@ package com.dvgame.app.data
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import com.dvgame.app.model.ApprovedGame
 import com.dvgame.app.model.InstalledGame
 
@@ -22,4 +23,8 @@ object GameScanner {
             }
         }.distinctBy { it.packageName }.sortedBy { it.name.lowercase() }
     }
+
+    fun loadIcon(context: Context, packageName: String): Drawable? = runCatching {
+        context.packageManager.getApplicationIcon(packageName)
+    }.getOrNull()
 }
