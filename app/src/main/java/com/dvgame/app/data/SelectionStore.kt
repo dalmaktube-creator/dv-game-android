@@ -39,6 +39,12 @@ class SelectionStore(context: Context) {
         editor.apply()
     }
 
+    fun loadFetchedAt(): Long = prefs.getLong("subscription_fetched_at", 0L)
+
+    fun saveFetchedAt(value: Long) {
+        prefs.edit().putLong("subscription_fetched_at", value).apply()
+    }
+
     fun loadLastGamePackage(): String? = prefs.getString("last_game_package", null)
 
     fun saveLastGamePackage(packageName: String?) {
