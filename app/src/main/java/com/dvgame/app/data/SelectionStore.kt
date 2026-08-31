@@ -61,6 +61,12 @@ class SelectionStore(context: Context) {
         editor.apply()
     }
 
+    fun loadUpdateMirrorUrl(): String = prefs.getString("update_mirror_url", "").orEmpty()
+
+    fun saveUpdateMirrorUrl(value: String) {
+        prefs.edit().putString("update_mirror_url", value.trim()).apply()
+    }
+
     fun loadAutoLaunchGame(): Boolean = prefs.getBoolean("auto_launch_game", true)
 
     fun saveAutoLaunchGame(enabled: Boolean) {
