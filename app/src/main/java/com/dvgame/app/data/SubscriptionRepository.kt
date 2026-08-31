@@ -46,7 +46,14 @@ class SubscriptionRepository(context: Context) {
         snapshot(fetched.value, false)
     }
 
-    fun reset() = store.resetProductState()
+    fun reset() {
+        store.clearSubscriptionLink()
+        store.saveCachedSubscription(null)
+        store.saveFetchedAt(0L)
+        store.saveLastGamePackage(null)
+        store.saveLastServerId(null)
+        store.saveAutoLaunchGame(true)
+    }
 
     private fun snapshot(subscription: DvSubscription, fromCache: Boolean) = SubscriptionSnapshot(
         subscription = subscription,
