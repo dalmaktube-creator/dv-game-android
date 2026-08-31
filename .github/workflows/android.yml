@@ -2,7 +2,7 @@ name: android
 
 on:
   push:
-    branches: [main, feat/app-v1]
+    branches: [main, feat/app-v1, feat/app-v2-ui]
     paths-ignore:
       - "docs/**"
       - "**/*.md"
