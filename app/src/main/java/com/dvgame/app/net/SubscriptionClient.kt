@@ -42,7 +42,8 @@ object SubscriptionClient {
                 check(status == 200) { "پاسخ سرور نامعتبر است: $status" }
                 val declared = connection.contentLengthLong
                 check(declared < 0 || declared <= MAX_BYTES) { "پاسخ اشتراک بیش از حد بزرگ است" }
-                return parse(readLimited(connection, MAX_BYTES))
+                val raw = readLimited(connection, MAX_BYTES)
+                return FetchedSubscription(raw, parse(raw))
             } finally {
                 connection.disconnect()
             }
