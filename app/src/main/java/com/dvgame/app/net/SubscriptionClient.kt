@@ -15,7 +15,9 @@ object SubscriptionClient {
     private const val MAX_CONFIG_BYTES = 128 * 1024
     private val packagePattern = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
 
-    fun fetch(input: String): DvSubscription {
+    fun fetch(input: String): DvSubscription = fetchPayload(input).value
+
+    fun fetchPayload(input: String): FetchedSubscription {
         var uri = normalize(input)
         val originalHost = uri.host.lowercase()
         repeat(MAX_REDIRECTS + 1) { redirect ->
