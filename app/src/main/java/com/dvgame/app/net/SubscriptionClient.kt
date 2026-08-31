@@ -140,3 +140,4 @@ object SubscriptionClient {
         return DvSubscription(version, serverTimeMs, account, catalog.getInt("version"), catalog.getString("digest").take(256), games, profiles)
     }
 }
+    data class FetchedSubscription(val raw: String, val value: DvSubscription)
