@@ -135,6 +135,8 @@ object SubscriptionClient {
                 add(ServerProfile(id, name, item.optString("location").take(128), config))
             }
         }
-        return DvSubscription(version, account, catalog.getInt("version"), catalog.getString("digest").take(256), games, profiles)
+        val serverTimeMs = root.optLong("serverTimeMs", System.currentTimeMillis())
+        require(serverTimeMs > 0) { "ساعت سرور نامعتبر است" }
+        return DvSubscription(version, serverTimeMs, account, catalog.getInt("version"), catalog.getString("digest").take(256), games, profiles)
     }
 }
