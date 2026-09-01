@@ -158,6 +158,13 @@ class Alpha12Activity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Alpha12App(ui: AppUiState, status: TunnelStatus, model: MainViewModel, connect: () -> Unit, install: (UpdateManifest) -> Unit) {
+    val subscriptionReady = ui.subscription?.let { subscription ->
+        subscription.account.connectionBlockReason(subscription.serverTimeMs) == null
+    } == true
+    if (!subscriptionReady) {
+        SubscriptionOnboarding(ui, model)
+        return
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Column { Text("DV Game", fontWeight = FontWeight.Bold); Text(ui.message, style = MaterialTheme.typography.labelSmall) } }) },
         bottomBar = {
