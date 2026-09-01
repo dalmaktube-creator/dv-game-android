@@ -12,6 +12,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -164,39 +180,119 @@ private fun Alpha12App(ui: AppUiState, status: TunnelStatus, model: MainViewMode
 private fun Home(ui: AppUiState, status: TunnelStatus, model: MainViewModel, connect: () -> Unit, padding: PaddingValues) {
     val locked = status !is TunnelStatus.Idle
     val connected = status is TunnelStatus.Connected || status is TunnelStatus.Reconnecting
+    val busy = ui.loading || status is TunnelStatus.Preparing || status is TunnelStatus.Starting || status is TunnelStatus.Stopping
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                    Text(statusTitle(status), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(if (locked) "انتخاب بازی و سرور تا پایان اتصال قفل است" else ui.message)
-                }
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                AtomConnectButton(
+                    connected = connected,
+                    busy = busy,
+                    enabled = !ui.loading && (connected || !locked),
+                    onClick = { if (connected) model.disconnect() else connect() },
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(statusTitle(status), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    if (locked) "انتخاب بازی و سرور تا پایان اتصال قفل است" else ui.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
-        item { GamePicker(ui.installedGames, ui.selectedGamePackage, !locked, model::selectGame) }
         item { ServerPicker(ui.subscription?.profiles.orEmpty(), ui.selectedServerId, !locked, model::selectServer) }
-        item {
-            Button(
-                onClick = { if (connected) model.disconnect() else connect() },
-                enabled = !ui.loading && (connected || !locked),
-                modifier = Modifier.fillMaxWidth().height(64.dp),
-                shape = RoundedCornerShape(20.dp),
-            ) {
-                if (ui.loading) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                else Text(if (connected) "قطع اتصال" else "شروع اتصال", style = MaterialTheme.typography.titleMedium)
-            }
-        }
+        item { GamePicker(ui.installedGames, ui.selectedGamePackage, !locked, model::selectGame) }
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Text("اجرای خودکار بازی", fontWeight = FontWeight.SemiBold); Text("بعد از اتصال موفق", style = MaterialTheme.typography.labelSmall) }
                 Switch(ui.autoLaunch, model::setAutoLaunch)
             }
         }
+        item { SubscriptionCard(ui) }
         if (ui.fromCache) item { Text("اطلاعات ذخیره‌شده نمایش داده می‌شود و در پس‌زمینه به‌روز خواهد شد.", style = MaterialTheme.typography.bodySmall) }
+    }
+}
+
+@Composable
+private fun SubscriptionCard(ui: AppUiState) {
+    val account = ui.subscription?.account
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("وضعیت اشتراک", fontWeight = FontWeight.Bold)
+            if (account == null) Text("لینک اشتراک را در تنظیمات وارد کنید", style = MaterialTheme.typography.bodySmall)
+            else {
+                InfoRow("وضعیت", if (account.state.equals("active", true)) "فعال" else account.state)
+                InfoRow("مصرف", "${formatBytes(account.usedBytes)} از ${formatBytes(account.totalBytes)}")
+                val progress = if (account.totalBytes > 0) (account.usedBytes.toFloat() / account.totalBytes).coerceIn(0f, 1f) else 0f
+                LinearProgressIndicator({ progress }, Modifier.fillMaxWidth())
+                InfoRow("انقضا", account.expiryMs?.let(::formatDate) ?: "بدون تاریخ")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AtomConnectButton(connected: Boolean, busy: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val transition = rememberInfiniteTransition(label = "atom")
+    val spin by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(if (connected) 4200 else 9000, easing = LinearEasing)),
+        label = "spin",
+    )
+    val pulse by transition.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(tween(1300, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulse",
+    )
+    val accent = when {
+        connected -> Color(0xFF25E39A)
+        busy -> Color(0xFFFFC24D)
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Box(
+        Modifier.size(250.dp).clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val radius = size.minDimension / 2f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(accent.copy(alpha = 0.35f), Color.Transparent),
+                    center = center,
+                    radius = radius * pulse,
+                ),
+                radius = radius * pulse,
+            )
+            repeat(3) { index ->
+                val direction = if (index % 2 == 0) 1f else -1f
+                rotate(degrees = spin * direction + index * 60f) {
+                    drawOval(
+                        color = accent.copy(alpha = 0.55f),
+                        topLeft = Offset(center.x - radius * 0.86f, center.y - radius * 0.32f),
+                        size = Size(radius * 1.72f, radius * 0.64f),
+                        style = Stroke(width = radius * 0.035f),
+                    )
+                    drawCircle(
+                        color = accent,
+                        radius = radius * 0.07f,
+                        center = Offset(center.x + radius * 0.86f, center.y),
+                    )
+                }
+            }
+            drawCircle(color = accent.copy(alpha = 0.18f), radius = radius * 0.42f * pulse)
+            drawCircle(color = accent, radius = radius * 0.3f, style = Stroke(width = radius * 0.03f))
+        }
+        if (busy) CircularProgressIndicator(Modifier.size(34.dp), strokeWidth = 3.dp)
+        else Text(
+            if (connected) "قطع اتصال" else "شروع اتصال",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -279,8 +375,17 @@ private fun Settings(ui: AppUiState, model: MainViewModel, install: (UpdateManif
         item { Button({ model.checkForUpdate() }, Modifier.fillMaxWidth()) { Text("بررسی به‌روزرسانی") } }
         ui.availableUpdate?.let { manifest -> item { Button({ install(manifest) }, Modifier.fillMaxWidth()) { Text("دانلود و نصب نسخه ${manifest.versionName}") } } }
         if (ui.updateStatus.isNotBlank()) item { Text(ui.updateStatus, style = MaterialTheme.typography.bodySmall) }
-        item { OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dalmaktube-creator/dv-game-android/releases"))) }, Modifier.fillMaxWidth()) { Text("بررسی نسخه‌های منتشرشده") } }
-        item { Text("منبع اول GitHub Release است؛ اگر در دسترس نبود از نشانی جایگزین استفاده می‌شود. سرور گیمینگ هرگز فایل نصبی نمی‌دهد.", style = MaterialTheme.typography.bodySmall) }
+        item {
+            OutlinedButton(
+                onClick = {
+                    val target = ui.mirrorUrl.trim()
+                    if (UpdateManifest.isHttps(target)) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                    else model.report("نشانی جایگزین ثبت نشده است؛ چون مخزن گیت‌هاب خصوصی است، یک نشانی HTTPS جایگزین وارد کنید")
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("باز کردن نشانی جایگزین") }
+        }
+        item { Text("اگر مخزن گیت‌هاب خصوصی باشد، دریافت به‌روزرسانی از آن ممکن نیست و نشانی جایگزین استفاده می‌شود. سرور گیمینگ هرگز فایل نصبی نمی‌دهد.", style = MaterialTheme.typography.bodySmall) }
         item { OutlinedButton(model::reset, Modifier.fillMaxWidth()) { Text("پاک‌کردن کامل اطلاعات") } }
         item { Text("نسخه ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium) }
     }

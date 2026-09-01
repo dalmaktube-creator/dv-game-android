@@ -151,7 +151,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updateStatus = if (newer) "نسخه ${manifest.versionName} آماده نصب است" else "برنامه به‌روز است",
                 )
             } }
-            .onFailure { error -> mutableUi.update { it.copy(updateStatus = friendlyError(error)) } }
+            .onFailure { error -> mutableUi.update { it.copy(updateStatus = updateError(error)) } }
     }
 
     suspend fun downloadUpdate(manifest: UpdateManifest): File {
@@ -221,6 +221,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 "پاسخ سرور قابل خواندن نبود؛ نسخه برنامه یا پنل را بررسی کنید"
             text.isBlank() -> "خطای ناشناخته رخ داد"
             else -> text
+        }
+    }
+
+    private fun updateError(error: Throwable): String {
+        val text = error.message.orEmpty()
+        return when {
+            text.contains("404") || text.contains("410") ->
+                "منبع به‌روزرسانی در دسترس نیست؛ اگر مخزن خصوصی است یا نسخه‌ای منتشر نشده، نشانی جایگزین را وارد کنید"
+            text.contains("401") || text.contains("403") ->
+                "دسترسی به منبع به‌روزرسانی رد شد؛ نشانی جایگزین را بررسی کنید"
+            else -> friendlyError(error)
         }
     }
 
