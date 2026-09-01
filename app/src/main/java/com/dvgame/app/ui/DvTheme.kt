@@ -8,34 +8,44 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 object DvColors {
-    val Primary = Color(0xFFFF6A00)
-    val PrimaryLight = Color(0xFFFF8A00)
-    val Amber = Color(0xFFFF9D00)
-    val Background = Color(0xFF151515)
-    val Surface = Color(0xFF222222)
-    val SurfaceHigh = Color(0xFF2A2A2A)
-    val Divider = Color(0xFF3A4047)
-    val WarmBorder = Color(0xFF5B3418)
-    val Glow = Color(0x57FF6A00)
-    val Success = Color(0xFF39DF59)
-    val Danger = Color(0xFFFF3B47)
-    val Text = Color(0xFFF4F4F5)
-    val Muted = Color(0xFF9AA1AB)
+    val Primary = Color(0xFFA78BFA)
+    val PrimaryDeep = Color(0xFF7C3AED)
+    val PrimaryDark = Color(0xFF4C1D95)
+    val PrimaryLight = Color(0xFFDDD6FE)
+    val AccentPink = Color(0xFFE879F9)
+    val Amber = Color(0xFFFBBF24)
+    val Background = Color(0xFF0D0A1A)
+    val BackgroundDeep = Color(0xFF080614)
+    val Surface = Color(0xFF171130)
+    val SurfaceHigh = Color(0xFF241C4A)
+    val CardBorder = Color(0x38A78BFA)
+    val Divider = Color(0xFF2C2350)
+    val WarmBorder = Color(0xFF3B2D66)
+    val Glow = Color(0x59A78BFA)
+    val Success = Color(0xFF34D399)
+    val Danger = Color(0xFFF87171)
+    val Text = Color(0xFFF5F3FF)
+    val Muted = Color(0xFF9D97B8)
 
     val ActiveButton = Brush.linearGradient(
-        0f to Color(0xFF9F3700),
-        0.58f to Color(0xFFFF6700),
-        1f to Color(0xFFFF8A00),
+        0f to Color(0xFF7C3AED),
+        0.55f to Color(0xFF8B5CF6),
+        1f to Color(0xFFC084FC),
+    )
+    val ScreenBackground = Brush.verticalGradient(
+        0f to Color(0xFF17102E),
+        0.45f to Color(0xFF0D0A1A),
+        1f to Color(0xFF080614),
     )
 }
 
 private val DvColorScheme = darkColorScheme(
     primary = DvColors.Primary,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF9F3700),
+    onPrimary = Color(0xFF1A1033),
+    primaryContainer = DvColors.PrimaryDark,
     onPrimaryContainer = DvColors.Text,
-    secondary = DvColors.Amber,
-    onSecondary = Color.Black,
+    secondary = DvColors.AccentPink,
+    onSecondary = Color(0xFF2A0A2E),
     background = DvColors.Background,
     onBackground = DvColors.Text,
     surface = DvColors.Surface,
@@ -43,9 +53,9 @@ private val DvColorScheme = darkColorScheme(
     surfaceVariant = DvColors.SurfaceHigh,
     onSurfaceVariant = DvColors.Muted,
     outline = DvColors.Divider,
-    outlineVariant = DvColors.WarmBorder,
+    outlineVariant = DvColors.CardBorder,
     error = DvColors.Danger,
-    onError = Color.White,
+    onError = Color(0xFF2A060A),
 )
 
 @Composable

@@ -61,6 +61,7 @@ private data class ConnectionRequest(
     val rawConfig: String,
     val packageName: String,
     val validUntilMs: Long,
+    val serverName: String = "",
 )
 
 class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, CommandServerHandler {
@@ -89,16 +90,20 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
                 val raw = intent.getStringExtra(EXTRA_CONFIG)
                 val pkg = intent.getStringExtra(EXTRA_PACKAGE)
                 val validUntil = intent.getLongExtra(EXTRA_VALID_UNTIL, 0)
+                val server = intent.getStringExtra(EXTRA_SERVER_NAME).orEmpty()
                 if (raw.isNullOrBlank() || pkg.isNullOrBlank()) {
                     publishBlocked("اطلاعات اتصال ناقص است")
                 } else {
-                    startConnection(ConnectionRequest(raw, pkg, validUntil), reconnect = false)
+                    startConnection(ConnectionRequest(raw, pkg, validUntil, server), reconnect = false)
                 }
             }
             else -> scope.launch {
                 val saved = SecureTunnelStore(this@CompatibilityVpnService).load()
                 if (saved == null) publishBlocked("اتصال ذخیره‌شده معتبر نیست")
-                else startConnection(ConnectionRequest(saved.config, saved.packageName, saved.validUntilMs), reconnect = true)
+                else startConnection(
+                    ConnectionRequest(saved.config, saved.packageName, saved.validUntilMs, ""),
+                    reconnect = true,
+                )
             }
         }
         return START_STICKY
@@ -171,7 +176,7 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
                     engineName = "libbox mixed (gVisor UDP)",
                 )
                 CompatibilityTunnelState.status.value = TunnelStatus.Connected(request.packageName)
-                updateNotification("فقط ${request.packageName} داخل تونل است")
+                updateNotification(connectedNotificationText(request.serverName, request.packageName))
                 return
             } catch (cancelled: CancellationException) {
                 stopEngineOnly()
@@ -502,6 +507,7 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
             .setSmallIcon(android.R.drawable.stat_sys_warning)
             .setContentTitle("DV Game")
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(open)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "قطع اتصال", stop)
             .setOngoing(true)
@@ -513,23 +519,34 @@ class CompatibilityVpnService : android.net.VpnService(), PlatformInterface, Com
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
     }
 
+    private fun connectedNotificationText(serverName: String, packageName: String): String {
+        val server = serverName.ifBlank { "سرور ذخیره‌شده" }
+        return "متصل به $server • فقط ${appLabel(packageName)} داخل تونل است"
+    }
+
+    private fun appLabel(packageName: String): String = runCatching {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString()
+    }.getOrDefault(packageName)
+
     companion object {
         private const val ACTION_CONNECT = "com.dvgame.app.CONNECT_LIBBOX"
         private const val ACTION_STOP = "com.dvgame.app.STOP_LIBBOX"
         private const val EXTRA_CONFIG = "config"
         private const val EXTRA_PACKAGE = "package"
         private const val EXTRA_VALID_UNTIL = "validUntil"
+        private const val EXTRA_SERVER_NAME = "serverName"
         private const val CHANNEL_ID = "dv_game_tunnel"
         private const val NOTIFICATION_ID = 201
-        private const val MAX_CONNECT_ATTEMPTS = 5
+        private const val MAX_CONNECT_ATTEMPTS = 2
         private const val ENGINE_START_TIMEOUT_MS = 15_000L
         private const val NETWORK_DEBOUNCE_MS = 750L
 
-        fun connect(context: Context, config: String, packageName: String, validUntil: Long) {
+        fun connect(context: Context, config: String, packageName: String, validUntil: Long, serverName: String = "") {
             val intent = Intent(context, CompatibilityVpnService::class.java).setAction(ACTION_CONNECT)
                 .putExtra(EXTRA_CONFIG, config)
                 .putExtra(EXTRA_PACKAGE, packageName)
                 .putExtra(EXTRA_VALID_UNTIL, validUntil)
+                .putExtra(EXTRA_SERVER_NAME, serverName)
             ContextCompat.startForegroundService(context, intent)
         }
 

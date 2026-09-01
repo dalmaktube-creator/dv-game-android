@@ -15,7 +15,9 @@ object SubscriptionClient {
     private const val MAX_CONFIG_BYTES = 128 * 1024
     private val packagePattern = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
 
-    fun fetch(input: String): DvSubscription {
+    fun fetch(input: String): DvSubscription = fetchPayload(input).value
+
+    fun fetchPayload(input: String): FetchedSubscription {
         var uri = normalize(input)
         val originalHost = uri.host.lowercase()
         repeat(MAX_REDIRECTS + 1) { redirect ->
@@ -40,7 +42,8 @@ object SubscriptionClient {
                 check(status == 200) { "پاسخ سرور نامعتبر است: $status" }
                 val declared = connection.contentLengthLong
                 check(declared < 0 || declared <= MAX_BYTES) { "پاسخ اشتراک بیش از حد بزرگ است" }
-                return parse(readLimited(connection, MAX_BYTES))
+                val raw = readLimited(connection, MAX_BYTES)
+                return FetchedSubscription(raw, parse(raw))
             } finally {
                 connection.disconnect()
             }
@@ -135,6 +138,9 @@ object SubscriptionClient {
                 add(ServerProfile(id, name, item.optString("location").take(128), config))
             }
         }
-        return DvSubscription(version, account, catalog.getInt("version"), catalog.getString("digest").take(256), games, profiles)
+        val serverTimeMs = root.optLong("serverTimeMs", System.currentTimeMillis())
+        require(serverTimeMs > 0) { "ساعت سرور نامعتبر است" }
+        return DvSubscription(version, serverTimeMs, account, catalog.getInt("version"), catalog.getString("digest").take(256), games, profiles)
     }
 }
+    data class FetchedSubscription(val raw: String, val value: DvSubscription)

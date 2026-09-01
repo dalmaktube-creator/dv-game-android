@@ -25,11 +25,21 @@ data class AccountInfo(val name: String, val state: String, val usedBytes: Long,
 
 data class DvSubscription(
     val apiVersion: Int,
+    val serverTimeMs: Long,
     val account: AccountInfo,
     val catalogVersion: Int,
     val catalogDigest: String,
     val games: List<ApprovedGame>,
     val profiles: List<ServerProfile>,
+)
+
+enum class AppScreen { HOME, ACCOUNT, SETTINGS }
+
+data class ConnectionChoice(
+    val account: AccountInfo,
+    val profile: ServerProfile,
+    val game: InstalledGame,
+    val autoLaunch: Boolean,
 )
 
 sealed interface TunnelStatus {

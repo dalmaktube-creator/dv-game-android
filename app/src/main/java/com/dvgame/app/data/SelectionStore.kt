@@ -39,6 +39,12 @@ class SelectionStore(context: Context) {
         editor.apply()
     }
 
+    fun loadFetchedAt(): Long = prefs.getLong("subscription_fetched_at", 0L)
+
+    fun saveFetchedAt(value: Long) {
+        prefs.edit().putLong("subscription_fetched_at", value).apply()
+    }
+
     fun loadLastGamePackage(): String? = prefs.getString("last_game_package", null)
 
     fun saveLastGamePackage(packageName: String?) {
@@ -53,6 +59,12 @@ class SelectionStore(context: Context) {
         val editor = prefs.edit()
         if (serverId.isNullOrBlank()) editor.remove("last_server_id") else editor.putString("last_server_id", serverId)
         editor.apply()
+    }
+
+    fun loadUpdateMirrorUrl(): String = prefs.getString("update_mirror_url", "").orEmpty()
+
+    fun saveUpdateMirrorUrl(value: String) {
+        prefs.edit().putString("update_mirror_url", value.trim()).apply()
     }
 
     fun loadAutoLaunchGame(): Boolean = prefs.getBoolean("auto_launch_game", true)
