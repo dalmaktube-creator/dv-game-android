@@ -370,55 +370,75 @@ private fun Home(ui: AppUiState, status: TunnelStatus, model: MainViewModel, con
     val locked = status !is TunnelStatus.Idle
     val connected = status is TunnelStatus.Connected || status is TunnelStatus.Reconnecting
     val busy = ui.loading || status is TunnelStatus.Preparing || status is TunnelStatus.Starting || status is TunnelStatus.Stopping
+    val stateColor = when {
+        connected -> DvColors.Success
+        busy -> DvColors.Amber
+        else -> DvColors.Text
+    }
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 AtomConnectButton(
                     connected = connected,
                     busy = busy,
                     enabled = !ui.loading && (connected || !locked),
                     onClick = { if (connected) model.disconnect() else connect() },
                 )
-                Spacer(Modifier.height(10.dp))
-                Text(statusTitle(status), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Text(statusTitle(status), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = stateColor)
                 Text(
                     if (locked) "انتخاب بازی و سرور تا پایان اتصال قفل است" else ui.message,
                     style = MaterialTheme.typography.bodySmall,
+                    color = DvColors.Muted,
                     textAlign = TextAlign.Center,
                 )
             }
         }
-        item { ServerPicker(ui.subscription?.profiles.orEmpty(), ui.selectedServerId, !locked, model::selectServer) }
-        item { GamePicker(ui.installedGames, ui.selectedGamePackage, !locked, model::selectGame) }
         item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("اجرای خودکار بازی", fontWeight = FontWeight.SemiBold); Text("بعد از اتصال موفق", style = MaterialTheme.typography.labelSmall) }
-                Switch(ui.autoLaunch, model::setAutoLaunch)
+            GlassCard {
+                Text("مسیر اتصال", fontWeight = FontWeight.Bold)
+                ServerPicker(ui.subscription?.profiles.orEmpty(), ui.selectedServerId, !locked, model::selectServer)
+                GamePicker(ui.installedGames, ui.selectedGamePackage, !locked, model::selectGame)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("اجرای خودکار بازی", fontWeight = FontWeight.SemiBold)
+                        Text("بازی بلافاصله بعد از اتصال باز می‌شود", style = MaterialTheme.typography.labelSmall, color = DvColors.Muted)
+                    }
+                    Switch(ui.autoLaunch, model::setAutoLaunch, colors = switchColors())
+                }
             }
         }
         item { SubscriptionCard(ui) }
-        if (ui.fromCache) item { Text("اطلاعات ذخیره‌شده نمایش داده می‌شود و در پس‌زمینه به‌روز خواهد شد.", style = MaterialTheme.typography.bodySmall) }
+        if (ui.fromCache) item { Text("اطلاعات ذخیره‌شده نمایش داده می‌شود و در پس‌زمینه به‌روز خواهد شد.", style = MaterialTheme.typography.bodySmall, color = DvColors.Muted) }
     }
 }
 
 @Composable
 private fun SubscriptionCard(ui: AppUiState) {
     val account = ui.subscription?.account
-    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    GlassCard {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("وضعیت اشتراک", fontWeight = FontWeight.Bold)
-            if (account == null) Text("لینک اشتراک را در تنظیمات وارد کنید", style = MaterialTheme.typography.bodySmall)
-            else {
-                InfoRow("وضعیت", if (account.state.equals("active", true)) "فعال" else account.state)
-                InfoRow("مصرف", "${formatBytes(account.usedBytes)} از ${formatBytes(account.totalBytes)}")
-                val progress = if (account.totalBytes > 0) (account.usedBytes.toFloat() / account.totalBytes).coerceIn(0f, 1f) else 0f
-                LinearProgressIndicator({ progress }, Modifier.fillMaxWidth())
-                InfoRow("انقضا", account.expiryMs?.let(::formatDate) ?: "بدون تاریخ")
+            if (account != null) {
+                val active = account.state.equals("active", true)
+                StatusPill(if (active) "فعال" else account.state, active)
             }
+        }
+        if (account == null) Text("لینک اشتراک را در تنظیمات وارد کنید", style = MaterialTheme.typography.bodySmall, color = DvColors.Muted)
+        else {
+            InfoRow("مصرف", "${formatBytes(account.usedBytes)} از ${formatBytes(account.totalBytes)}")
+            val progress = if (account.totalBytes > 0) (account.usedBytes.toFloat() / account.totalBytes).coerceIn(0f, 1f) else 0f
+            LinearProgressIndicator(
+                { progress },
+                Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = DvColors.Primary,
+                trackColor = DvColors.Divider,
+            )
+            InfoRow("انقضا", account.expiryMs?.let(::formatDate) ?: "بدون تاریخ")
         }
     }
 }
@@ -429,58 +449,133 @@ private fun AtomConnectButton(connected: Boolean, busy: Boolean, enabled: Boolea
     val spin by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(if (connected) 4200 else 9000, easing = LinearEasing)),
+        animationSpec = infiniteRepeatable(tween(if (connected) 5200 else 11000, easing = LinearEasing)),
         label = "spin",
     )
     val pulse by transition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(tween(1300, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "pulse",
     )
     val accent = when {
-        connected -> Color(0xFF25E39A)
-        busy -> Color(0xFFFFC24D)
-        else -> MaterialTheme.colorScheme.primary
+        connected -> DvColors.Success
+        busy -> DvColors.Amber
+        else -> DvColors.Primary
+    }
+    val accentDeep = when {
+        connected -> Color(0xFF065F46)
+        busy -> Color(0xFF92400E)
+        else -> DvColors.PrimaryDark
+    }
+    val accentLight = when {
+        connected -> Color(0xFFA7F3D0)
+        busy -> Color(0xFFFDE68A)
+        else -> DvColors.PrimaryLight
     }
     Box(
-        Modifier.size(250.dp).clickable(enabled = enabled, onClick = onClick),
+        Modifier.size(260.dp).clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(accent.copy(alpha = 0.35f), Color.Transparent),
+                    colors = listOf(accent.copy(alpha = if (enabled) 0.30f else 0.14f), Color.Transparent),
                     center = center,
                     radius = radius * pulse,
                 ),
+                center = center,
                 radius = radius * pulse,
             )
-            repeat(3) { index ->
-                val direction = if (index % 2 == 0) 1f else -1f
-                rotate(degrees = spin * direction + index * 60f) {
+            val rx = radius * 0.88f
+            val ry = radius * 0.34f
+            floatArrayOf(-24f, 36f, 96f).forEachIndexed { index, tilt ->
+                val alphaScale = if (enabled) 1f else 0.5f
+                rotate(degrees = tilt, pivot = center) {
                     drawOval(
-                        color = accent.copy(alpha = 0.55f),
-                        topLeft = Offset(center.x - radius * 0.86f, center.y - radius * 0.32f),
-                        size = Size(radius * 1.72f, radius * 0.64f),
-                        style = Stroke(width = radius * 0.035f),
-                    )
-                    drawCircle(
-                        color = accent,
-                        radius = radius * 0.07f,
-                        center = Offset(center.x + radius * 0.86f, center.y),
+                        color = accent.copy(alpha = (0.60f - index * 0.12f) * alphaScale),
+                        topLeft = Offset(center.x - rx, center.y - ry),
+                        size = Size(rx * 2f, ry * 2f),
+                        style = Stroke(width = radius * 0.02f),
                     )
                 }
+                val direction = if (index % 2 == 0) 1.0 else -1.0
+                val phase = Math.toRadians(((spin * direction + index * 120.0) % 360.0))
+                val tiltRad = Math.toRadians(tilt.toDouble())
+                val localX = cos(phase) * rx
+                val localY = sin(phase) * ry
+                val electronX = center.x + (localX * cos(tiltRad) - localY * sin(tiltRad)).toFloat()
+                val electronY = center.y + (localX * sin(tiltRad) + localY * cos(tiltRad)).toFloat()
+                drawCircle(accent.copy(alpha = 0.30f * alphaScale), radius * 0.085f, Offset(electronX, electronY))
+                drawCircle(accentLight.copy(alpha = alphaScale), radius * 0.038f, Offset(electronX, electronY))
             }
-            drawCircle(color = accent.copy(alpha = 0.18f), radius = radius * 0.42f * pulse)
-            drawCircle(color = accent, radius = radius * 0.3f, style = Stroke(width = radius * 0.03f))
+            val coreRadius = radius * 0.40f * pulse
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(accentLight, accent, accentDeep),
+                    center = Offset(center.x - coreRadius * 0.38f, center.y - coreRadius * 0.42f),
+                    radius = coreRadius * 1.35f,
+                ),
+                center = center,
+                radius = coreRadius,
+            )
+            drawCircle(
+                color = accent.copy(alpha = 0.5f),
+                center = center,
+                radius = coreRadius,
+                style = Stroke(width = radius * 0.012f),
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.7f),
+                center = Offset(center.x - coreRadius * 0.34f, center.y - coreRadius * 0.40f),
+                radius = coreRadius * 0.11f,
+            )
         }
-        if (busy) CircularProgressIndicator(Modifier.size(34.dp), strokeWidth = 3.dp)
+        if (busy) CircularProgressIndicator(Modifier.size(40.dp), strokeWidth = 3.dp, color = Color.White)
         else Text(
             if (connected) "قطع اتصال" else "شروع اتصال",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun AtomMark(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val radius = size.minDimension / 2f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(DvColors.Primary.copy(alpha = 0.35f), Color.Transparent),
+                center = center,
+                radius = radius,
+            ),
+            center = center,
+            radius = radius,
+        )
+        val rx = radius * 0.86f
+        val ry = radius * 0.34f
+        floatArrayOf(-24f, 36f, 96f).forEachIndexed { index, tilt ->
+            rotate(degrees = tilt, pivot = center) {
+                drawOval(
+                    color = DvColors.Primary.copy(alpha = 0.65f - index * 0.12f),
+                    topLeft = Offset(center.x - rx, center.y - ry),
+                    size = Size(rx * 2f, ry * 2f),
+                    style = Stroke(width = radius * 0.045f),
+                )
+            }
+        }
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(DvColors.PrimaryLight, DvColors.Primary, DvColors.PrimaryDark),
+                center = Offset(center.x - radius * 0.12f, center.y - radius * 0.14f),
+                radius = radius * 0.55f,
+            ),
+            center = center,
+            radius = radius * 0.34f,
         )
     }
 }
