@@ -183,6 +183,70 @@ private fun Alpha12App(ui: AppUiState, status: TunnelStatus, model: MainViewMode
     }
 }
 
+@Composable
+private fun SubscriptionOnboarding(ui: AppUiState, model: MainViewModel) {
+    val clipboard = LocalClipboardManager.current
+    Surface(Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            item { Text(
+                "راه‌اندازی DV Game",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            ) }
+            item { Spacer(Modifier.height(8.dp)) }
+            item { Text(
+                "برای ورود، لینک HTTPS اشتراک را وارد و تأیید کنید. لینک روی همین دستگاه ذخیره می‌شود و در اجراهای بعد دوباره پرسیده نخواهد شد.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ) }
+            item { Spacer(Modifier.height(24.dp)) }
+            item { OutlinedTextField(
+                value = ui.link,
+                onValueChange = model::setLink,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("لینک HTTPS اشتراک") },
+                placeholder = { Text("https://…") },
+                supportingText = { Text("لینک باید معتبر و اشتراک فعال باشد.") },
+                singleLine = true,
+                enabled = !ui.loading,
+            ) }
+            item { Spacer(Modifier.height(12.dp)) }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { clipboard.getText()?.text?.let(model::setLink) },
+                        enabled = !ui.loading,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("چسباندن لینک") }
+                    Button(
+                        onClick = { model.refresh() },
+                        enabled = ui.link.isNotBlank() && !ui.loading,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (ui.loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Text("تأیید و ورود")
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(16.dp)) }
+            item { Text(
+                ui.message,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                color = if (ui.subscription == null && !ui.loading && ui.link.isNotBlank())
+                    MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            ) }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Home(ui: AppUiState, status: TunnelStatus, model: MainViewModel, connect: () -> Unit, padding: PaddingValues) {
