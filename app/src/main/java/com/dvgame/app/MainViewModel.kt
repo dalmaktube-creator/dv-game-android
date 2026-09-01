@@ -112,7 +112,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun connect(choice: ConnectionChoice) {
         val now = System.currentTimeMillis()
-        tunnel.connect(choice.profile.config, choice.game.packageName, choice.account.localRestoreValidUntilMs(now))
+        tunnel.connect(
+            rawConfig = choice.profile.config,
+            approvedPackage = choice.game.packageName,
+            restoreValidUntilMs = choice.account.localRestoreValidUntilMs(now),
+            serverName = choice.profile.name,
+        )
         mutableUi.update { it.copy(message = "اتصال برقرار شد") }
     }
 

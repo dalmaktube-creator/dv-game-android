@@ -74,13 +74,13 @@ class TunnelRepository(private val context: Context, @Suppress("UNUSED_PARAMETER
 
     private val gate = Mutex()
 
-    suspend fun connect(rawConfig: String, approvedPackage: String, restoreValidUntilMs: Long) = gate.withLock {
+    suspend fun connect(rawConfig: String, approvedPackage: String, restoreValidUntilMs: Long, serverName: String = "") = gate.withLock {
         require(restoreValidUntilMs > System.currentTimeMillis()) { "اعتبار محلی اتصال پایان یافته است" }
         require(PACKAGE_NAME_PATTERN.matches(approvedPackage) && isInstalled(approvedPackage)) { "بازی تأییدشده روی گوشی نصب نیست" }
         parseWireGuardCompatConfig(rawConfig)
         ensureFullyStopped()
         CompatibilityTunnelState.status.value = TunnelStatus.Preparing
-        CompatibilityVpnService.connect(context, rawConfig, approvedPackage, restoreValidUntilMs)
+        CompatibilityVpnService.connect(context, rawConfig, approvedPackage, restoreValidUntilMs, serverName)
         val result = try {
             withTimeout(30_000) {
                 status.filter {
