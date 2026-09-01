@@ -237,6 +237,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val GITHUB_UPDATE_MANIFEST =
-            "https://github.com/dalmaktube-creator/dv-game-android/releases/latest/download/dv-game-update.json"
+            "https://github.com/dalmaktube-creator/dv-game-android/releases/download/alpha-latest/dv-game-update.json"
     }
 }

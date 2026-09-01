@@ -89,7 +89,7 @@ jobs:
             "packageName": "com.dvgame.app",
             "sha256": "$APK_SHA256",
             "signatureSha256": "3f4a9eeb1bc8a7d6a4eac46ae5bcecd09ad61ec2d64e6363b4cc19aa64a85b1c",
-            "primaryUrl": "https://github.com/dalmaktube-creator/dv-game-android/releases/latest/download/DV-Game-0.2.0-alpha13-debug.apk",
+            "primaryUrl": "https://github.com/dalmaktube-creator/dv-game-android/releases/download/alpha-latest/DV-Game-0.2.0-alpha13-debug.apk",
             "mirrorUrl": "",
             "notes": "DV Game 0.2.0 Alpha 13"
           }
@@ -140,6 +140,15 @@ jobs:
               --title "DV Game 0.2.0 Alpha 13" \
               --prerelease \
               --notes "صفحه اصلی تازه با دکمه اتصال انیمیشنی اتم‌گونه، چیدمان مشابه اپ‌های VPN و پیام‌های خطای دقیق‌تر برای به‌روزرسانی. سرور گیمینگ هیچ‌گاه فایل نصبی ارائه نمی‌کند."
+          fi
+          if gh release view alpha-latest >/dev/null 2>&1; then
+            gh release upload alpha-latest $ASSETS --clobber
+          else
+            gh release create alpha-latest $ASSETS \
+              --target "$GITHUB_SHA" \
+              --title "DV Game Alpha (latest)" \
+              --prerelease \
+              --notes "این انتشار همیشه به آخرین نسخه آلفا اشاره می‌کند و منبع ثابت به‌روزرسانی درون‌برنامه‌ای است."
           fi
 
       - name: Report failure diagnostics
