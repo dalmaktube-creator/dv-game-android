@@ -124,7 +124,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ASSETS="DV-Game-0.2.0-alpha12-debug.apk DV-Game-0.2.0-alpha12-debug.apk.sha256 dv-game-update.json libbox.sha256 apk-signing.txt"
+          ASSETS=""
+          for asset in DV-Game-0.2.0-alpha12-debug.apk DV-Game-0.2.0-alpha12-debug.apk.sha256 dv-game-update.json libbox.sha256 apk-signing.txt; do
+            if [ -f "$asset" ]; then
+              ASSETS="$ASSETS $asset"
+            fi
+          done
+          test -n "$ASSETS"
           if gh release view v0.2.0-alpha.12 >/dev/null 2>&1; then
             gh release upload v0.2.0-alpha.12 $ASSETS --clobber
           else
