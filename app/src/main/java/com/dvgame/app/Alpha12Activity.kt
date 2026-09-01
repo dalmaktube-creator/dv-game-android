@@ -170,89 +170,197 @@ private fun Alpha12App(ui: AppUiState, status: TunnelStatus, model: MainViewMode
     val subscriptionReady = ui.subscription?.let { subscription ->
         subscription.account.connectionBlockReason(subscription.serverTimeMs) == null
     } == true
-    if (!subscriptionReady) {
-        SubscriptionOnboarding(ui, model)
-        return
-    }
-    Scaffold(
-        topBar = { TopAppBar(title = { Column { Text("DV Game", fontWeight = FontWeight.Bold); Text(ui.message, style = MaterialTheme.typography.labelSmall) } }) },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(ui.screen == AppScreen.HOME, { model.setScreen(AppScreen.HOME) }, { Text("خانه") })
-                NavigationBarItem(ui.screen == AppScreen.ACCOUNT, { model.setScreen(AppScreen.ACCOUNT) }, { Text("حساب") })
-                NavigationBarItem(ui.screen == AppScreen.SETTINGS, { model.setScreen(AppScreen.SETTINGS) }, { Text("تنظیمات") })
-            }
-        },
-    ) { padding ->
-        when (ui.screen) {
-            AppScreen.HOME -> Home(ui, status, model, connect, padding)
-            AppScreen.ACCOUNT -> Account(ui, padding)
-            AppScreen.SETTINGS -> Settings(ui, model, install, padding)
+    ScreenBackground {
+        if (!subscriptionReady) {
+            SubscriptionOnboarding(ui, model)
+            return@ScreenBackground
         }
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("DV Game", fontWeight = FontWeight.ExtraBold)
+                            Text(ui.message, style = MaterialTheme.typography.labelSmall, color = DvColors.Muted)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                )
+            },
+            bottomBar = {
+                NavigationBar(containerColor = Color(0xFF120D26)) {
+                    NavigationBarItem(ui.screen == AppScreen.HOME, { model.setScreen(AppScreen.HOME) }, { Text("خانه") }, colors = navItemColors())
+                    NavigationBarItem(ui.screen == AppScreen.ACCOUNT, { model.setScreen(AppScreen.ACCOUNT) }, { Text("حساب") }, colors = navItemColors())
+                    NavigationBarItem(ui.screen == AppScreen.SETTINGS, { model.setScreen(AppScreen.SETTINGS) }, { Text("تنظیمات") }, colors = navItemColors())
+                }
+            },
+        ) { padding ->
+            when (ui.screen) {
+                AppScreen.HOME -> Home(ui, status, model, connect, padding)
+                AppScreen.ACCOUNT -> Account(ui, padding)
+                AppScreen.SETTINGS -> Settings(ui, model, install, padding)
+            }
+        }
+    }
+}
+
+@Composable
+private fun navItemColors() = NavigationBarItemDefaults.colors(
+    selectedIconColor = DvColors.Primary,
+    unselectedIconColor = DvColors.Muted,
+    indicatorColor = DvColors.PrimaryDark.copy(alpha = 0.65f),
+)
+
+@Composable
+private fun switchColors() = SwitchDefaults.colors(
+    checkedThumbColor = Color.White,
+    checkedTrackColor = DvColors.PrimaryDeep,
+    uncheckedThumbColor = DvColors.Muted,
+    uncheckedTrackColor = DvColors.SurfaceHigh,
+)
+
+@Composable
+private fun ScreenBackground(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize().background(DvColors.ScreenBackground)) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(DvColors.Primary.copy(alpha = 0.16f), Color.Transparent),
+                    center = Offset(size.width / 2f, size.height * 0.16f),
+                    radius = size.width * 0.95f,
+                ),
+                center = Offset(size.width / 2f, size.height * 0.16f),
+                radius = size.width * 0.95f,
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(DvColors.AccentPink.copy(alpha = 0.07f), Color.Transparent),
+                    center = Offset(size.width * 0.85f, size.height * 0.88f),
+                    radius = size.width * 0.85f,
+                ),
+                center = Offset(size.width * 0.85f, size.height * 0.88f),
+                radius = size.width * 0.85f,
+            )
+        }
+        content()
+    }
+}
+
+@Composable
+private fun GlassCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = DvColors.Surface.copy(alpha = 0.82f),
+        border = BorderStroke(1.dp, DvColors.CardBorder),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun GradientButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    val brush = if (enabled) DvColors.ActiveButton
+    else Brush.linearGradient(listOf(DvColors.SurfaceHigh, DvColors.SurfaceHigh))
+    Box(
+        modifier
+            .clip(shape)
+            .background(brush)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 13.dp),
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+@Composable
+private fun StatusPill(text: String, ok: Boolean) {
+    val color = if (ok) DvColors.Success else DvColors.Danger
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = color.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.5f)),
+    ) {
+        Text(
+            text,
+            Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
 @Composable
 private fun SubscriptionOnboarding(ui: AppUiState, model: MainViewModel) {
     val clipboard = LocalClipboardManager.current
-    Surface(Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            item { Text(
-                "راه‌اندازی DV Game",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            ) }
-            item { Spacer(Modifier.height(8.dp)) }
-            item { Text(
-                "برای ورود، لینک HTTPS اشتراک را وارد و تأیید کنید. لینک روی همین دستگاه ذخیره می‌شود و در اجراهای بعد دوباره پرسیده نخواهد شد.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            ) }
-            item { Spacer(Modifier.height(24.dp)) }
-            item { OutlinedTextField(
-                value = ui.link,
-                onValueChange = model::setLink,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("لینک HTTPS اشتراک") },
-                placeholder = { Text("https://…") },
-                supportingText = { Text("لینک باید معتبر و اشتراک فعال باشد.") },
-                singleLine = true,
-                enabled = !ui.loading,
-            ) }
-            item { Spacer(Modifier.height(12.dp)) }
-            item {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        item { AtomMark(Modifier.size(96.dp)) }
+        item { Spacer(Modifier.height(18.dp)) }
+        item { Text(
+            "راه‌اندازی DV Game",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
+        ) }
+        item { Spacer(Modifier.height(8.dp)) }
+        item { Text(
+            "برای ورود، لینک HTTPS اشتراک را وارد و تأیید کنید. لینک روی همین دستگاه ذخیره می‌شود و در اجراهای بعد دوباره پرسیده نخواهد شد.",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = DvColors.Muted,
+        ) }
+        item { Spacer(Modifier.height(24.dp)) }
+        item {
+            GlassCard {
+                OutlinedTextField(
+                    value = ui.link,
+                    onValueChange = model::setLink,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("لینک HTTPS اشتراک") },
+                    placeholder = { Text("https://…") },
+                    supportingText = { Text("لینک باید معتبر و اشتراک فعال باشد.") },
+                    singleLine = true,
+                    enabled = !ui.loading,
+                    shape = RoundedCornerShape(14.dp),
+                )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = { clipboard.getText()?.text?.let(model::setLink) },
                         enabled = !ui.loading,
                         modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, DvColors.Primary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DvColors.Primary),
                     ) { Text("چسباندن لینک") }
-                    Button(
+                    GradientButton(
                         onClick = { model.refresh() },
                         enabled = ui.link.isNotBlank() && !ui.loading,
                         modifier = Modifier.weight(1f),
                     ) {
-                        if (ui.loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else Text("تأیید و ورود")
+                        if (ui.loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                        else Text("تأیید و ورود", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
-            item { Spacer(Modifier.height(16.dp)) }
-            item { Text(
-                ui.message,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                color = if (ui.subscription == null && !ui.loading && ui.link.isNotBlank())
-                    MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            ) }
         }
+        item { Spacer(Modifier.height(16.dp)) }
+        item { Text(
+            ui.message,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            color = if (ui.subscription == null && !ui.loading && ui.link.isNotBlank())
+                MaterialTheme.colorScheme.error else DvColors.Muted,
+        ) }
     }
 }
 
