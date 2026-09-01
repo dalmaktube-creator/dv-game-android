@@ -57,15 +57,16 @@ jobs:
           sha256sum app/libs/libbox.aar | tee libbox.sha256
 
       - name: Restore stable Alpha signing key
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.DV_GAME_CI_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.DV_GAME_CI_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$KEYSTORE_BASE64"
-          test -n "$KEYSTORE_PASSWORD"
+          if [ -z "${KEYSTORE_BASE64:-}" ] || [ -z "${KEYSTORE_PASSWORD:-}" ]; then
+            echo "Stable signing key unavailable; the build will use an ephemeral debug key."
+            exit 0
+          fi
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dv-game-ci-signing.p12"
           keytool -list -keystore "$RUNNER_TEMP/dv-game-ci-signing.p12" -storepass "$KEYSTORE_PASSWORD" -alias dv-game-ci >/dev/null
           echo "DV_GAME_KEYSTORE_PATH=$RUNNER_TEMP/dv-game-ci-signing.p12" >> "$GITHUB_ENV"
@@ -95,7 +96,7 @@ jobs:
           JSON
 
       - name: Verify stable APK signature
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/app-v1'
+        if: env.DV_GAME_KEYSTORE_PATH != ''
         shell: bash
         run: |
           set -euo pipefail

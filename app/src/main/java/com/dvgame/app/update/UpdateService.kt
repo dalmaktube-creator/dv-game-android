@@ -20,18 +20,24 @@ import java.security.MessageDigest
 class UpdateService(private val context: Context) {
 
     suspend fun check(manifestUrls: List<String>): UpdateManifest = withContext(Dispatchers.IO) {
-        var failure: Throwable? = null
+        val failures = mutableListOf<String>()
         for (url in manifestUrls) {
             runCatching { UpdateManifest.parse(readText(url)) }
                 .onSuccess { return@withContext it }
-                .onFailure { failure = it }
+                .onFailure { failures += sourceLabel(url) + ": " + (it.message ?: "خطای ناشناخته") }
         }
-        throw IllegalStateException(failure?.message ?: "منبع به‌روزرسانی در دسترس نیست")
+        throw IllegalStateException(
+            if (failures.isEmpty()) "هیچ منبع به‌روزرسانی معتبری تنظیم نشده است"
+            else "بررسی به‌روزرسانی ناموفق بود — " + failures.joinToString(" | ")
+        )
     }
+
+    private fun sourceLabel(url: String): String =
+        if (url.contains("github.com", true)) "گیت‌هاب" else "نشانی جایگزین"
 
     suspend fun download(manifest: UpdateManifest): File = withContext(Dispatchers.IO) {
         require(manifest.isNewerThan(currentVersionCode())) { "برنامه به‌روز است" }
-        require(manifest.signatureSha256 == installedSignatureSha256()) { "امضای فایل با نسخه نصب‌شده یکی نیست" }
+        require(manifest.signatureSha256 == installedSignatureSha256()) { "امضای نسخه تازه با نسخه نصب‌شده یکی نیست؛ برای یک‌بار نسخه فعلی را حذف و نسخه تازه را دستی نصب کنید" }
         val target = File(context.cacheDir, "updates/dv-game-${manifest.versionCode}.apk")
         target.parentFile?.mkdirs()
         var failure: Throwable? = null
