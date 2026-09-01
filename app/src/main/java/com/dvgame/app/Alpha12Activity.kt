@@ -591,10 +591,11 @@ private fun GamePicker(games: List<InstalledGame>, selected: String?, enabled: B
             onValueChange = {}, readOnly = true, enabled = enabled,
             label = { Text("بازی") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier.fillMaxWidth().menuAnchor(),
+            shape = RoundedCornerShape(14.dp),
         )
         ExposedDropdownMenu(expanded, { expanded = false }) {
             games.forEach { game -> DropdownMenuItem(
-                text = { Row(verticalAlignment = Alignment.CenterVertically) { GameIcon(game); Spacer(Modifier.size(10.dp)); Column { Text(game.name); Text(game.packageName, style = MaterialTheme.typography.labelSmall) } } },
+                text = { Row(verticalAlignment = Alignment.CenterVertically) { GameIcon(game); Spacer(Modifier.size(10.dp)); Column { Text(game.name); Text(game.packageName, style = MaterialTheme.typography.labelSmall, color = DvColors.Muted) } } },
                 onClick = { choose(game.packageName); expanded = false },
             ) }
         }
@@ -605,7 +606,7 @@ private fun GamePicker(games: List<InstalledGame>, selected: String?, enabled: B
 private fun GameIcon(game: InstalledGame) {
     val context = LocalContext.current
     val bitmap = remember(game.packageName) { runCatching { context.packageManager.getApplicationIcon(game.packageName).toBitmap(72, 72).asImageBitmap() }.getOrNull() }
-    if (bitmap != null) Image(bitmap, game.name, Modifier.size(36.dp))
+    if (bitmap != null) Image(bitmap, game.name, Modifier.size(36.dp).clip(RoundedCornerShape(9.dp)))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -619,10 +620,11 @@ private fun ServerPicker(profiles: List<ServerProfile>, selected: String?, enabl
             onValueChange = {}, readOnly = true, enabled = enabled,
             label = { Text("سرور") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier.fillMaxWidth().menuAnchor(),
+            shape = RoundedCornerShape(14.dp),
         )
         ExposedDropdownMenu(expanded, { expanded = false }) {
             profiles.forEach { profile -> DropdownMenuItem(
-                text = { Column { Text(profile.name); Text(profile.location, style = MaterialTheme.typography.labelSmall) } },
+                text = { Column { Text(profile.name); Text(profile.location, style = MaterialTheme.typography.labelSmall, color = DvColors.Muted) } },
                 onClick = { choose(profile.id); expanded = false },
             ) }
         }
@@ -633,16 +635,44 @@ private fun ServerPicker(profiles: List<ServerProfile>, selected: String?, enabl
 private fun Account(ui: AppUiState, padding: PaddingValues) {
     val account = ui.subscription?.account
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("حساب کاربری", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        if (account == null) item { Text("برای نمایش حساب، ابتدا لینک اشتراک را در تنظیمات وارد کنید.") }
+        item { Text("حساب کاربری", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold) }
+        if (account == null) item { GlassCard { Text("برای نمایش حساب، ابتدا لینک اشتراک را وارد کنید.", color = DvColors.Muted) } }
         else {
-            item { InfoRow("نام", account.name) }
-            item { InfoRow("وضعیت", if (account.state.equals("active", true)) "فعال" else account.state) }
             item {
-                val progress = if (account.totalBytes > 0) (account.usedBytes.toFloat() / account.totalBytes).coerceIn(0f, 1f) else 0f
-                Column { Text("مصرف: ${formatBytes(account.usedBytes)} از ${formatBytes(account.totalBytes)}"); Spacer(Modifier.height(8.dp)); LinearProgressIndicator({ progress }, Modifier.fillMaxWidth()) }
+                GlassCard {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text(account.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("اشتراک DV Game", style = MaterialTheme.typography.labelSmall, color = DvColors.Muted)
+                        }
+                        val active = account.state.equals("active", true)
+                        StatusPill(if (active) "فعال" else account.state, active)
+                    }
+                }
             }
-            item { InfoRow("انقضا", account.expiryMs?.let(::formatDate) ?: "بدون تاریخ") }
+            item {
+                GlassCard {
+                    val daysLeft = account.expiryMs?.let { ((it - System.currentTimeMillis()) / 86_400_000L).coerceAtLeast(0) }
+                    if (daysLeft != null) {
+                        Text("$daysLeft", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = DvColors.Primary)
+                        Text("روز باقی‌مانده تا انقضا", style = MaterialTheme.typography.bodySmall, color = DvColors.Muted)
+                    }
+                    InfoRow("انقضا", account.expiryMs?.let(::formatDate) ?: "بدون تاریخ")
+                }
+            }
+            item {
+                GlassCard {
+                    Text("مصرف", fontWeight = FontWeight.Bold)
+                    val progress = if (account.totalBytes > 0) (account.usedBytes.toFloat() / account.totalBytes).coerceIn(0f, 1f) else 0f
+                    LinearProgressIndicator(
+                        { progress },
+                        Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        color = DvColors.Primary,
+                        trackColor = DvColors.Divider,
+                    )
+                    InfoRow("استفاده‌شده", "${formatBytes(account.usedBytes)} از ${formatBytes(account.totalBytes)}")
+                }
+            }
         }
     }
 }
@@ -651,32 +681,82 @@ private fun Account(ui: AppUiState, padding: PaddingValues) {
 private fun Settings(ui: AppUiState, model: MainViewModel, install: (UpdateManifest) -> Unit, padding: PaddingValues) {
     val context = LocalContext.current
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { Text("تنظیمات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        item { OutlinedTextField(ui.link, model::setLink, Modifier.fillMaxWidth(), label = { Text("لینک HTTPS اشتراک") }, singleLine = true) }
-        item { Button({ model.refresh() }, enabled = ui.link.isNotBlank() && !ui.loading, modifier = Modifier.fillMaxWidth()) { Text("دریافت و بررسی لینک") } }
-        item { HorizontalDivider() }
-        item { OutlinedTextField(ui.mirrorUrl, model::setMirrorUrl, Modifier.fillMaxWidth(), label = { Text("نشانی جایگزین به‌روزرسانی (اختیاری)") }, singleLine = true) }
-        item { Button({ model.checkForUpdate() }, Modifier.fillMaxWidth()) { Text("بررسی به‌روزرسانی") } }
-        ui.availableUpdate?.let { manifest -> item { Button({ install(manifest) }, Modifier.fillMaxWidth()) { Text("دانلود و نصب نسخه ${manifest.versionName}") } } }
-        if (ui.updateStatus.isNotBlank()) item { Text(ui.updateStatus, style = MaterialTheme.typography.bodySmall) }
+        item { Text("تنظیمات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold) }
         item {
-            OutlinedButton(
-                onClick = {
-                    val target = ui.mirrorUrl.trim()
-                    if (UpdateManifest.isHttps(target)) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
-                    else model.report("نشانی جایگزین ثبت نشده است؛ چون مخزن گیت‌هاب خصوصی است، یک نشانی HTTPS جایگزین وارد کنید")
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("باز کردن نشانی جایگزین") }
+            GlassCard {
+                Text("اشتراک", fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    ui.link,
+                    model::setLink,
+                    Modifier.fillMaxWidth(),
+                    label = { Text("لینک HTTPS اشتراک") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                )
+                GradientButton(onClick = { model.refresh() }, enabled = ui.link.isNotBlank() && !ui.loading, modifier = Modifier.fillMaxWidth()) {
+                    Text("دریافت و بررسی لینک", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
         }
-        item { Text("اگر مخزن گیت‌هاب خصوصی باشد، دریافت به‌روزرسانی از آن ممکن نیست و نشانی جایگزین استفاده می‌شود. سرور گیمینگ هرگز فایل نصبی نمی‌دهد.", style = MaterialTheme.typography.bodySmall) }
-        item { OutlinedButton(model::reset, Modifier.fillMaxWidth()) { Text("پاک‌کردن کامل اطلاعات") } }
-        item { Text("نسخه ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium) }
+        item {
+            GlassCard {
+                Text("به‌روزرسانی", fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    ui.mirrorUrl,
+                    model::setMirrorUrl,
+                    Modifier.fillMaxWidth(),
+                    label = { Text("نشانی جایگزین به‌روزرسانی (اختیاری)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                )
+                GradientButton(onClick = { model.checkForUpdate() }, enabled = true, modifier = Modifier.fillMaxWidth()) {
+                    Text("بررسی به‌روزرسانی", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                ui.availableUpdate?.let { manifest ->
+                    GradientButton(onClick = { install(manifest) }, enabled = true, modifier = Modifier.fillMaxWidth()) {
+                        Text("دانلود و نصب نسخه ${manifest.versionName}", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+                if (ui.updateStatus.isNotBlank()) Text(ui.updateStatus, style = MaterialTheme.typography.bodySmall, color = DvColors.Muted)
+                OutlinedButton(
+                    onClick = {
+                        val target = ui.mirrorUrl.trim()
+                        if (UpdateManifest.isHttps(target)) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                        else model.report("نشانی جایگزین ثبت نشده است؛ یک نشانی HTTPS معتبر وارد کنید")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, DvColors.Primary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DvColors.Primary),
+                ) { Text("باز کردن نشانی جایگزین") }
+                Text(
+                    "منبع اصلی به‌روزرسانی انتشار عمومی گیت‌هاب است؛ نشانی جایگزین کاملاً جدا از سرور گیمینگ میزبانی می‌شود و سرور گیمینگ هرگز فایل نصبی ارائه نمی‌کند.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DvColors.Muted,
+                )
+            }
+        }
+        item {
+            GlassCard {
+                Text("بازنشانی", fontWeight = FontWeight.Bold)
+                OutlinedButton(
+                    onClick = model::reset,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, DvColors.Danger),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DvColors.Danger),
+                ) { Text("پاک‌کردن کامل اطلاعات") }
+            }
+        }
+        item { Text("نسخه ${BuildConfig.VERSION_NAME}", Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelMedium, color = DvColors.Muted, textAlign = TextAlign.Center) }
     }
 }
 
 @Composable
-private fun InfoRow(title: String, value: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(title); Text(value, fontWeight = FontWeight.SemiBold) }
+private fun InfoRow(title: String, value: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Text(title, style = MaterialTheme.typography.bodyMedium, color = DvColors.Muted)
+    Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+}
 
 private fun statusTitle(status: TunnelStatus): String = when (status) {
     TunnelStatus.Idle -> "آماده اتصال"
