@@ -36,6 +36,8 @@ import com.dvgame.app.model.*
 import com.dvgame.app.ui.*
 import com.dvgame.app.update.UpdateManifest
 import com.dvgame.app.update.UpdateService
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.*
 
@@ -210,7 +212,7 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
     val inf = rememberInfiniteTransition(label = "ctrl")
     val breathe by inf.animateFloat(
         0.96f, 1.05f,
-        infiniteRepeatable(tween(4400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        infiniteRepeatable(tween(2200, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)), RepeatMode.Reverse),
         label = "breathe"
     )
     val wavePhase by inf.animateFloat(
@@ -225,19 +227,23 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
     )
     val idleToneProgress by inf.animateFloat(
         0f, 1f,
-        infiniteRepeatable(tween(4800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        infiniteRepeatable(tween(2400, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)), RepeatMode.Reverse),
         label = "idleTone"
     )
     val idleTone = lerp(Color(0xFF999895), Color(0xFFBAB9B5), idleToneProgress)
     val connectToneProgress by inf.animateFloat(
         0f, 1f,
-        infiniteRepeatable(tween(1080, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        infiniteRepeatable(tween(540, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)), RepeatMode.Reverse),
         label = "connectTone"
     )
     val connectTone = lerp(Color(0xFFC8C3B0), Color(0xFFF1CC3B), connectToneProgress)
     val glowPulse by inf.animateFloat(
         0f, 1f,
-        infiniteRepeatable(tween(4400, easing = FastOutSlowInEasing, delayMillis = 780), RepeatMode.Reverse),
+        infiniteRepeatable(
+            animation = tween(2200, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)),
+            repeatMode = RepeatMode.Reverse,
+            initialStartOffset = StartOffset(780),
+        ),
         label = "glowPulse"
     )
 
@@ -424,7 +430,7 @@ private fun SelectionPanel(
 @Composable
 private fun SelectorRow(label: String, value: String, isGame: Boolean, locked: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(10.dp, 15.dp)
+        Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 15.dp, vertical = 10.dp)
             .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !locked, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -434,7 +440,7 @@ private fun SelectorRow(label: String, value: String, isGame: Boolean, locked: B
                 .border(1.dp, Color(0x0DFFFFFF), RoundedCornerShape(12.dp)),
             Alignment.Center
         ) {
-            Canvas(Modifier.size(22.dp)) {
+            Canvas(Modifier.size(19.dp)) {
                 val s = size.minDimension / 24f
                 val col = if (isGame) Color(0xFFD4C3A0) else Color(0xFFA7A9AE)
                 if (isGame) {
