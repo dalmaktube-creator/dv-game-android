@@ -215,15 +215,15 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
         infiniteRepeatable(tween(2200, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)), RepeatMode.Reverse),
         label = "breathe"
     )
-    val wavePhase by inf.animateFloat(
+    val linkPhase by inf.animateFloat(
         0f, 1f,
-        infiniteRepeatable(tween(if (connected) 3600 else 1560, easing = LinearEasing)),
-        label = "wavePhase"
+        infiniteRepeatable(tween(1560, easing = LinearEasing)),
+        label = "linkPhase"
     )
-    val powerPulse by inf.animateFloat(
+    val greenPhase by inf.animateFloat(
         0f, 1f,
-        infiniteRepeatable(tween(1080, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "powerPulse"
+        infiniteRepeatable(tween(3600, easing = LinearEasing)),
+        label = "greenPhase"
     )
     val idleToneProgress by inf.animateFloat(
         0f, 1f,
