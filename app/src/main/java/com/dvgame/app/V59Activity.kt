@@ -254,37 +254,15 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
         infiniteRepeatable(tween(2200, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)), RepeatMode.Reverse),
         label = "breathe"
     )
-    val linkPhase by inf.animateFloat(
-        0f, 1f,
-        infiniteRepeatable(tween(1560, easing = LinearEasing)),
-        label = "linkPhase"
-    )
-    val greenPhase by inf.animateFloat(
-        0f, 1f,
-        infiniteRepeatable(tween(3600, easing = LinearEasing)),
-        label = "greenPhase"
-    )
-    val idleToneProgress by inf.animateFloat(
-        0f, 1f,
-        infiniteRepeatable(tween(2400, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)), RepeatMode.Reverse),
-        label = "idleTone"
-    )
+    val linkElapsedMillis = rememberStateElapsedMillis(connecting, 620L)
+    val greenElapsedMillis = rememberStateElapsedMillis(connected, 620L)
+    val idleElapsedMillis = rememberStateElapsedMillis(idle)
+    val toneEase = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
+    val idleToneProgress = easedPingPong(idleElapsedMillis, 4800L, toneEase)
     val idleTone = lerp(Color(0xFF999895), Color(0xFFBAB9B5), idleToneProgress)
-    val connectToneProgress by inf.animateFloat(
-        0f, 1f,
-        infiniteRepeatable(tween(540, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)), RepeatMode.Reverse),
-        label = "connectTone"
-    )
+    val connectToneProgress = easedPingPong(linkElapsedMillis, 1080L, toneEase)
     val connectTone = lerp(Color(0xFFC8C3B0), Color(0xFFF1CC3B), connectToneProgress)
-    val glowPulse by inf.animateFloat(
-        0f, 1f,
-        infiniteRepeatable(
-            animation = tween(2200, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)),
-            repeatMode = RepeatMode.Reverse,
-            initialStartOffset = StartOffset(780),
-        ),
-        label = "glowPulse"
-    )
+    val glowPulse = easedPingPong(greenElapsedMillis, 4400L, toneEase, 780L)
     val cssEase = CubicBezierEasing(0.25f, 0.10f, 0.25f, 1f)
     val exitEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
     val trackAlpha by animateFloatAsState(if (idle) 0.52f else 0f, tween(600, easing = cssEase), label = "trackAlpha")
@@ -368,19 +346,25 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
 
             if (linkFieldAlpha > 0f) {
                 repeat(3) { index ->
-                    val phase = (linkPhase + index / 3f) % 1f
-                    val scale = 1.01f + 0.37f * linkEase.transform(phase)
-                    val opacity = keyedOpacity(phase, 0.13f, 0.48f, 0.72f, 0.16f, linkEase) * 0.58f * linkFieldAlpha
-                    drawDotField(fieldR, scale, opacity, Color(0xFF9CAEA3))
+                    val ageMillis = linkElapsedMillis - index * 520L
+                    if (ageMillis >= 0L) {
+                        val phase = (ageMillis % 1560L).toFloat() / 1560f
+                        val scale = 1.01f + 0.37f * linkEase.transform(phase)
+                        val opacity = keyedOpacity(phase, 0.13f, 0.48f, 0.72f, 0.16f, linkEase) * 0.58f * linkFieldAlpha
+                        drawDotField(fieldR, scale, opacity, Color(0xFF9CAEA3))
+                    }
                 }
             }
 
             if (greenFieldAlpha > 0f) {
                 repeat(3) { index ->
-                    val phase = (greenPhase + index / 3f) % 1f
-                    val scale = 1.01f + 0.37f * greenEase.transform(phase)
-                    val opacity = keyedOpacity(phase, 0.15f, 0.28f, 0.74f, 0.13f, greenEase) * greenFieldAlpha
-                    drawDotField(fieldR, scale, opacity, Color(0xFF4EB712))
+                    val ageMillis = greenElapsedMillis - index * 1200L
+                    if (ageMillis >= 0L) {
+                        val phase = (ageMillis % 3600L).toFloat() / 3600f
+                        val scale = 1.01f + 0.37f * greenEase.transform(phase)
+                        val opacity = keyedOpacity(phase, 0.15f, 0.28f, 0.74f, 0.13f, greenEase) * greenFieldAlpha
+                        drawDotField(fieldR, scale, opacity, Color(0xFF4EB712))
+                    }
                 }
             }
 
