@@ -257,63 +257,84 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             val trackR = 104.5.dp.toPx()
             val fieldR = 92.5.dp.toPx()
             val tickCount = 140
-            val innerRatio = 0.82f
-            val outerRatio = 1.0f
-            val tickWidth = 1.dp.toPx()
+            val tickPeriod = 360f / tickCount
+            val radialScale = sqrt(2f)
+            val linkEase = CubicBezierEasing(0.18f, 0.62f, 0.34f, 1f)
+            val greenEase = CubicBezierEasing(0.22f, 0.55f, 0.26f, 1f)
+            val maskBands = arrayOf(
+                floatArrayOf(0.505f, 0.52f, 0.0125f),
+                floatArrayOf(0.52f, 0.56f, 0.0475f),
+                floatArrayOf(0.56f, 0.60f, 0.115f),
+                floatArrayOf(0.60f, 0.64f, 0.25f),
+                floatArrayOf(0.64f, 0.672f, 0.51f),
+                floatArrayOf(0.672f, 0.687f, 0.84f),
+                floatArrayOf(0.687f, 0.6945f, 1f),
+                floatArrayOf(0.6945f, 0.70f, 0.5f),
+            )
 
-            fun drawTicks(r: Float, scale: Float, alpha: Float, color: Color) {
-                val sr = r * scale
-                val ir = sr * innerRatio
-                val or = sr * outerRatio
-                repeat(tickCount) { i ->
-                    val a = (2.0 * PI * i / tickCount - PI / 2).toFloat()
-                    val x = cos(a)
-                    val y = sin(a)
-                    drawLine(
-                        color.copy(alpha = alpha),
-                        Offset(cx + x * ir, cy + y * ir),
-                        Offset(cx + x * or, cy + y * or),
-                        tickWidth, StrokeCap.Round
+            fun interpolate(from: Float, to: Float, amount: Float) = from + (to - from) * amount
+
+            fun keyedOpacity(
+                phase: Float,
+                firstKey: Float,
+                firstAlpha: Float,
+                secondKey: Float,
+                secondAlpha: Float,
+                easing: Easing,
+            ): Float = when {
+                phase < firstKey -> interpolate(0f, firstAlpha, easing.transform(phase / firstKey))
+                phase < secondKey -> interpolate(
+                    firstAlpha,
+                    secondAlpha,
+                    easing.transform((phase - firstKey) / (secondKey - firstKey)),
+                )
+                else -> interpolate(
+                    secondAlpha,
+                    0f,
+                    easing.transform((phase - secondKey) / (1f - secondKey)),
+                )
+            }
+
+            fun drawDotField(baseRadius: Float, scale: Float, opacity: Float, color: Color) {
+                val scaledRadius = baseRadius * scale
+                maskBands.forEach { band ->
+                    val inner = scaledRadius * band[0] * radialScale
+                    val outer = scaledRadius * band[1] * radialScale
+                    val radius = (inner + outer) / 2f
+                    val strokeWidth = max(0.35.dp.toPx(), outer - inner)
+                    val bounds = Rect(cx - radius, cy - radius, cx + radius, cy + radius)
+                    val dots = Path().apply {
+                        repeat(tickCount) { index ->
+                            addArc(bounds, -90f + index * tickPeriod + 0.14f, 0.478625f)
+                        }
+                    }
+                    drawPath(
+                        dots,
+                        color.copy(alpha = (opacity * band[2]).coerceIn(0f, 1f)),
+                        style = Stroke(strokeWidth, cap = StrokeCap.Butt),
                     )
                 }
             }
 
             if (idle) {
-                drawTicks(trackR, breathe, 0.52f, Color(0xFF9CAEA3))
+                drawDotField(trackR, breathe, 0.52f * 0.58f, Color(0xFF9CAEA3))
             }
 
             if (connecting) {
-                repeat(3) { k ->
-                    val p = (wavePhase + k / 3f) % 1f
-                    val scale = 1.01f + 0.38f * p
-                    val alpha = when {
-                        p < 0.13f -> (p / 0.13f) * 0.48f
-                        p < 0.72f -> (0.48f - (p - 0.13f) / 0.59f * 0.32f)
-                        else -> (0.16f - (p - 0.72f) / 0.28f * 0.16f)
-                    }
-                    drawTicks(fieldR, scale, alpha, Color(0xFF9CAEA3))
+                repeat(3) { index ->
+                    val phase = (wavePhase + index / 3f) % 1f
+                    val scale = 1.01f + 0.37f * linkEase.transform(phase)
+                    val opacity = keyedOpacity(phase, 0.13f, 0.48f, 0.72f, 0.16f, linkEase) * 0.58f
+                    drawDotField(fieldR, scale, opacity, Color(0xFF9CAEA3))
                 }
             }
 
             if (connected) {
-                repeat(3) { k ->
-                    val p = (wavePhase + k / 3f) % 1f
-                    val scale = 1.01f + 0.38f * p
-                    val alpha = when {
-                        p < 0.13f -> (p / 0.13f) * 0.28f
-                        p < 0.72f -> (0.28f - (p - 0.13f) / 0.59f * 0.15f)
-                        else -> (0.13f - (p - 0.72f) / 0.28f * 0.13f)
-                    }
-                    drawTicks(fieldR, scale, alpha, Color(0xFF4EB712))
-                }
-            }
-
-            if (stopping) {
-                repeat(3) { k ->
-                    val p = (wavePhase + k / 3f) % 1f
-                    val scale = 1.01f + 0.38f * p
-                    val alpha = (1f - p) * 0.14f
-                    drawTicks(fieldR, scale, alpha, Color(0xFF4EB712))
+                repeat(3) { index ->
+                    val phase = (wavePhase + index / 3f) % 1f
+                    val scale = 1.01f + 0.37f * greenEase.transform(phase)
+                    val opacity = keyedOpacity(phase, 0.15f, 0.28f, 0.74f, 0.13f, greenEase)
+                    drawDotField(fieldR, scale, opacity, Color(0xFF4EB712))
                 }
             }
 
