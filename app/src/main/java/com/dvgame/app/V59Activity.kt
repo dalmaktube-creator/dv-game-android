@@ -323,24 +323,24 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                 }
             }
 
-            if (idle) {
-                drawDotField(trackR, breathe, 0.52f * 0.58f, Color(0xFF9CAEA3))
+            if (trackAlpha > 0f) {
+                drawDotField(trackR, breathe, trackAlpha * 0.58f, Color(0xFF9CAEA3))
             }
 
-            if (connecting) {
+            if (linkFieldAlpha > 0f) {
                 repeat(3) { index ->
                     val phase = (linkPhase + index / 3f) % 1f
                     val scale = 1.01f + 0.37f * linkEase.transform(phase)
-                    val opacity = keyedOpacity(phase, 0.13f, 0.48f, 0.72f, 0.16f, linkEase) * 0.58f
+                    val opacity = keyedOpacity(phase, 0.13f, 0.48f, 0.72f, 0.16f, linkEase) * 0.58f * linkFieldAlpha
                     drawDotField(fieldR, scale, opacity, Color(0xFF9CAEA3))
                 }
             }
 
-            if (connected) {
+            if (greenFieldAlpha > 0f) {
                 repeat(3) { index ->
                     val phase = (greenPhase + index / 3f) % 1f
                     val scale = 1.01f + 0.37f * greenEase.transform(phase)
-                    val opacity = keyedOpacity(phase, 0.15f, 0.28f, 0.74f, 0.13f, greenEase)
+                    val opacity = keyedOpacity(phase, 0.15f, 0.28f, 0.74f, 0.13f, greenEase) * greenFieldAlpha
                     drawDotField(fieldR, scale, opacity, Color(0xFF4EB712))
                 }
             }
