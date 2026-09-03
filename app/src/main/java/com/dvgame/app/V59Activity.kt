@@ -518,11 +518,44 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                     cap,
                 )
             }
+            fun drawPowerGlyphGlow(color: Color, blurRadius: Float) {
+                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = sw
+                    strokeCap = android.graphics.Paint.Cap.ROUND
+                    this.color = color.toArgb()
+                    maskFilter = android.graphics.BlurMaskFilter(
+                        blurRadius,
+                        android.graphics.BlurMaskFilter.Blur.NORMAL,
+                    )
+                }
+                drawIntoCanvas { canvas ->
+                    val nativeCanvas = canvas.nativeCanvas
+                    nativeCanvas.drawArc(
+                        android.graphics.RectF(
+                            iconCx - 8f * iconScale,
+                            iconCy - 8f * iconScale,
+                            iconCx + 8f * iconScale,
+                            iconCy + 8f * iconScale,
+                        ),
+                        315f, 270f, false, paint,
+                    )
+                    nativeCanvas.drawLine(
+                        iconCx,
+                        iconCy - 9f * iconScale,
+                        iconCx,
+                        iconCy - 1f * iconScale,
+                        paint,
+                    )
+                }
+            }
             if (connectedToneProgress > 0f) {
                 val innerGlowAlpha = (0.4032f + 0.0768f * glowPulse) * connectedToneProgress
                 val outerGlowAlpha = (0.08f + 0.12f * glowPulse) * connectedToneProgress
-                drawPowerGlyph(iconColor.copy(alpha = outerGlowAlpha), sw + 12.dp.toPx())
-                drawPowerGlyph(iconColor.copy(alpha = innerGlowAlpha), sw + 5.dp.toPx())
+                val innerGlowBlur = (6f + 2.4f * glowPulse) * connectedToneProgress * density
+                val outerGlowBlur = (12f + 7.2f * glowPulse) * connectedToneProgress * density
+                drawPowerGlyphGlow(iconColor.copy(alpha = outerGlowAlpha), outerGlowBlur)
+                drawPowerGlyphGlow(iconColor.copy(alpha = innerGlowAlpha), innerGlowBlur)
             }
             drawPowerGlyph(iconColor, sw)
         }
