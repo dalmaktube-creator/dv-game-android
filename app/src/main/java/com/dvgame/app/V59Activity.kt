@@ -457,7 +457,7 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                         0f to Color.White.copy(alpha = 0.012f),
                         1f to Color.Transparent,
                     ),
-                    center = Offset(cx - 26.dp.toPx(), cy - 20.dp.toPx()),
+                    center = Offset(cx - 10.8.dp.toPx(), cy - 8.4.dp.toPx()),
                     radius = btnR,
                 ),
                 btnR,
@@ -478,7 +478,7 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             }
 
             val borderColor = lerp(Color.White.copy(alpha = 0.10f), Color(0xFF4EB712), borderProgress)
-            drawCircle(borderColor, btnR, buttonCenter, style = Stroke(1.dp.toPx()))
+            drawCircle(borderColor, btnR, buttonCenter, style = Stroke(1.2.dp.toPx()))
             drawCircle(
                 Brush.linearGradient(
                     colorStops = arrayOf(
@@ -489,9 +489,9 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                     start = gradientStart,
                     end = gradientEnd,
                 ),
-                btnR - 0.5.dp.toPx(),
+                btnR - 0.6.dp.toPx(),
                 buttonCenter,
-                style = Stroke(1.dp.toPx()),
+                style = Stroke(1.2.dp.toPx()),
             )
 
             val iconScale = 74.4.dp.toPx() / 24f
