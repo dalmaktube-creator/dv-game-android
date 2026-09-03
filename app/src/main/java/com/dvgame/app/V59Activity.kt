@@ -245,14 +245,14 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
         Modifier.fillMaxWidth().height(335.dp),
         Alignment.Center
     ) {
-        Canvas(Modifier.size(228.dp)) {
+        Canvas(Modifier.size(300.dp)) {
             val cx = center.x
             val cy = center.y
             val trackR = 104.5.dp.toPx()
             val fieldR = 92.5.dp.toPx()
             val tickCount = 140
-            val innerRatio = 0.505f
-            val outerRatio = 0.70f
+            val innerRatio = 0.82f
+            val outerRatio = 1.0f
             val tickWidth = 1.dp.toPx()
 
             fun drawTicks(r: Float, scale: Float, alpha: Float, color: Color) {
@@ -328,9 +328,28 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
 
             val borderColor = if (connected) Color(0xFF4EB712) else Color.White.copy(alpha = 0.10f)
             drawCircle(borderColor, btnR, Offset(cx, cy), style = Stroke(1.dp.toPx()))
-            if (connected) drawCircle(Color(0xFF4EB712).copy(alpha = 0.12f), btnR + 5.dp.toPx(), Offset(cx, cy), style = Stroke(10.dp.toPx()))
+            if (connecting) {
+                drawCircle(
+                    connectTone.copy(alpha = 0.07f + 0.09f * powerPulse),
+                    btnR + (3f + 4f * powerPulse).dp.toPx(), Offset(cx, cy),
+                    style = Stroke((7f + 4f * powerPulse).dp.toPx())
+                )
+            }
+            if (connected) {
+                drawCircle(
+                    Color(0xFF4EB712).copy(alpha = 0.08f + 0.08f * glowPulse),
+                    btnR + (4f + 3f * glowPulse).dp.toPx(), Offset(cx, cy),
+                    style = Stroke((8f + 4f * glowPulse).dp.toPx())
+                )
+            }
 
-            val iconScale = 74.dp.toPx() / 24f
+            val iconPulseScale = when {
+                connecting -> 0.94f + 0.12f * powerPulse
+                connected -> 0.985f + 0.03f * powerPulse
+                stopping -> 1f - 0.04f * powerPulse
+                else -> 1f
+            }
+            val iconScale = (74.dp.toPx() / 24f) * iconPulseScale
             val iconCx = cx
             val iconCy = cy
             val sw = 1.45f * iconScale
