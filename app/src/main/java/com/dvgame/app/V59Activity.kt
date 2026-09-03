@@ -36,8 +36,6 @@ import com.dvgame.app.model.*
 import com.dvgame.app.ui.*
 import com.dvgame.app.update.UpdateManifest
 import com.dvgame.app.update.UpdateService
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.*
 
