@@ -203,6 +203,45 @@ private fun MenuButton(onClick: () -> Unit) {
 }
 
 @Composable
+private fun rememberStateElapsedMillis(active: Boolean, exitDurationMillis: Long = 0L): Long {
+    var elapsedMillis by remember { mutableLongStateOf(-1L) }
+    LaunchedEffect(active) {
+        if (active) {
+            val startedAt = withFrameNanos { it }
+            while (true) {
+                val frameTime = withFrameNanos { it }
+                elapsedMillis = (frameTime - startedAt) / 1_000_000L
+            }
+        } else if (elapsedMillis >= 0L && exitDurationMillis > 0L) {
+            val baseElapsed = elapsedMillis
+            val exitStartedAt = withFrameNanos { it }
+            var exitElapsed: Long
+            do {
+                val frameTime = withFrameNanos { it }
+                exitElapsed = (frameTime - exitStartedAt) / 1_000_000L
+                elapsedMillis = baseElapsed + exitElapsed
+            } while (exitElapsed < exitDurationMillis)
+            elapsedMillis = -1L
+        } else {
+            elapsedMillis = -1L
+        }
+    }
+    return elapsedMillis
+}
+
+private fun easedPingPong(
+    elapsedMillis: Long,
+    durationMillis: Long,
+    easing: Easing,
+    delayMillis: Long = 0L,
+): Float {
+    if (elapsedMillis < delayMillis) return 0f
+    val phase = ((elapsedMillis - delayMillis) % durationMillis).toFloat() / durationMillis
+    val leg = if (phase <= 0.5f) phase * 2f else (1f - phase) * 2f
+    return easing.transform(leg)
+}
+
+@Composable
 private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
     val connected = state is TunnelStatus.Connected || state is TunnelStatus.Reconnecting
     val connecting = state is TunnelStatus.Preparing || state is TunnelStatus.Starting
