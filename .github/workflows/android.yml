@@ -118,28 +118,28 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Alpha 16 release
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_alpha16 == 'true'
+      - name: Publish Alpha 17 release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_alpha17 == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           ASSETS=""
-          for asset in DV-Game-0.2.0-alpha16-debug.apk DV-Game-0.2.0-alpha16-debug.apk.sha256 dv-game-update.json libbox.sha256 apk-signing.txt; do
+          for asset in DV-Game-0.2.0-alpha17-debug.apk DV-Game-0.2.0-alpha17-debug.apk.sha256 dv-game-update.json libbox.sha256 apk-signing.txt; do
             if [ -f "$asset" ]; then
               ASSETS="$ASSETS $asset"
             fi
           done
           test -n "$ASSETS"
-          if gh release view v0.2.0-alpha.16 >/dev/null 2>&1; then
-            gh release upload v0.2.0-alpha.16 $ASSETS --clobber
+          if gh release view v0.2.0-alpha.17 >/dev/null 2>&1; then
+            gh release upload v0.2.0-alpha.17 $ASSETS --clobber
           else
-            gh release create v0.2.0-alpha.16 $ASSETS \
+            gh release create v0.2.0-alpha.17 $ASSETS \
               --target "$GITHUB_SHA" \
-              --title "DV Game 0.2.0 Alpha 16" \
+              --title "DV Game 0.2.0 Alpha 17" \
               --prerelease \
-              --notes "پیاده‌سازی بومی کانسپت Minimal Boost با ظاهر تیره، دکمه اتصال و موج‌های انیمیشنی، منوی تنظیمات و انتخاب بازی و سرور؛ همراه با به‌روزرسانی امن درون‌برنامه‌ای."
+              --notes "تطبیق مستقیم کانسپت Minimal Boost: هندسه و ابعاد دقیق، زمان‌بندی واقعی موج‌ها، سایه‌های native blur، عمق سه‌بعدی دکمه و typography پنل؛ همراه با به‌روزرسانی امن درون‌برنامه‌ای."
           fi
           if gh release view alpha-latest >/dev/null 2>&1; then
             gh release upload alpha-latest $ASSETS --clobber
