@@ -362,13 +362,13 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                 shadowRadius,
                 Offset(cx, cy + 20.dp.toPx()),
             )
-            if (connected) {
+            if (borderProgress > 0f) {
                 val connectedGlowR = btnR + 10.dp.toPx()
                 drawCircle(
                     Brush.radialGradient(
                         colorStops = arrayOf(
-                            0f to Color(0x1F4EB712),
-                            (btnR / connectedGlowR) to Color(0x1F4EB712),
+                            0f to Color(0xFF4EB712).copy(alpha = 0.12f * borderProgress),
+                            (btnR / connectedGlowR) to Color(0xFF4EB712).copy(alpha = 0.12f * borderProgress),
                             1f to Color.Transparent,
                         ),
                         center = buttonCenter,
