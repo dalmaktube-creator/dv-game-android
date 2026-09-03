@@ -637,16 +637,19 @@ private fun SelectorRow(label: String, value: String, isGame: Boolean, locked: B
                 color = Color(0xFF676A71),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontSize = 9.sp,
+                    lineHeight = 11.sp,
                     fontWeight = FontWeight.W700,
-                    letterSpacing = 1.4.sp,
+                    letterSpacing = 1.26.sp,
                 ),
             )
+            Spacer(Modifier.height(5.dp))
             Text(
                 value,
                 color = DvColors.Text,
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight(620),
                 ),
             )
         }
