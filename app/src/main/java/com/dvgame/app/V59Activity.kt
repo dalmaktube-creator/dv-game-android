@@ -483,36 +483,30 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             val iconColor = when {
                 connected -> Color(0xFF4EB712)
                 connecting -> connectTone
-                stopping -> Color(0xFF4EB712).copy(alpha = 0.6f)
                 else -> idleTone
             }
-            if (connected) {
-                val glowAlpha = 0.40f + 0.08f * glowPulse
+            fun drawPowerGlyph(color: Color, strokeWidth: Float) {
                 drawArc(
-                    iconColor.copy(alpha = glowAlpha), 315f, 270f, false,
+                    color, 315f, 270f, false,
                     Offset(iconCx - 8f * iconScale, iconCy - 8f * iconScale),
                     Size(16f * iconScale, 16f * iconScale),
-                    style = Stroke(sw * 3, cap = cap)
+                    style = Stroke(strokeWidth, cap = cap),
                 )
                 drawLine(
-                    iconColor.copy(alpha = glowAlpha),
+                    color,
                     Offset(iconCx, iconCy - 9f * iconScale),
                     Offset(iconCx, iconCy - 1f * iconScale),
-                    sw * 3, cap
+                    strokeWidth,
+                    cap,
                 )
             }
-            drawArc(
-                iconColor, 315f, 270f, false,
-                Offset(iconCx - 8f * iconScale, iconCy - 8f * iconScale),
-                Size(16f * iconScale, 16f * iconScale),
-                style = Stroke(sw, cap = cap)
-            )
-            drawLine(
-                iconColor,
-                Offset(iconCx, iconCy - 9f * iconScale),
-                Offset(iconCx, iconCy - 1f * iconScale),
-                sw, cap
-            )
+            if (connected) {
+                val innerGlowAlpha = 0.4032f + 0.0768f * glowPulse
+                val outerGlowAlpha = 0.08f + 0.12f * glowPulse
+                drawPowerGlyph(iconColor.copy(alpha = outerGlowAlpha), sw + 12.dp.toPx())
+                drawPowerGlyph(iconColor.copy(alpha = innerGlowAlpha), sw + 5.dp.toPx())
+            }
+            drawPowerGlyph(iconColor, sw)
         }
         Box(
             Modifier.size(185.dp).clip(CircleShape)
