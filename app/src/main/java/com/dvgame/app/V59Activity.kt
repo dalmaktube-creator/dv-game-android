@@ -368,36 +368,27 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
 
             val btnR = 92.4.dp.toPx()
             val buttonCenter = Offset(cx, cy)
-            val shadowSpread = 48.dp.toPx()
-            val shadowRadius = btnR + shadowSpread
-            drawCircle(
-                Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0f to Color.Black.copy(alpha = 0.40f),
-                        (btnR / shadowRadius) to Color.Black.copy(alpha = 0.40f),
-                        1f to Color.Transparent,
-                    ),
-                    center = Offset(cx, cy + 20.dp.toPx()),
-                    radius = shadowRadius,
-                ),
-                shadowRadius,
-                Offset(cx, cy + 20.dp.toPx()),
-            )
-            if (borderProgress > 0f) {
-                val connectedGlowR = btnR + 10.dp.toPx()
-                drawCircle(
-                    Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to Color(0xFF4EB712).copy(alpha = 0.12f * borderProgress),
-                            (btnR / connectedGlowR) to Color(0xFF4EB712).copy(alpha = 0.12f * borderProgress),
-                            1f to Color.Transparent,
-                        ),
-                        center = buttonCenter,
-                        radius = connectedGlowR,
-                    ),
-                    connectedGlowR,
-                    buttonCenter,
+            val shadowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.Black.copy(alpha = 0.40f).toArgb()
+                maskFilter = android.graphics.BlurMaskFilter(
+                    57.6.dp.toPx(),
+                    android.graphics.BlurMaskFilter.Blur.NORMAL,
                 )
+            }
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawCircle(cx, cy + 24.dp.toPx(), btnR, shadowPaint)
+            }
+            if (borderProgress > 0f) {
+                val connectedGlowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color(0xFF4EB712).copy(alpha = 0.12f * borderProgress).toArgb()
+                    maskFilter = android.graphics.BlurMaskFilter(
+                        12.dp.toPx(),
+                        android.graphics.BlurMaskFilter.Blur.NORMAL,
+                    )
+                }
+                drawIntoCanvas { canvas ->
+                    canvas.nativeCanvas.drawCircle(cx, cy, btnR, connectedGlowPaint)
+                }
             }
 
             val direction = Offset(0.573576f * btnR, 0.819152f * btnR)
