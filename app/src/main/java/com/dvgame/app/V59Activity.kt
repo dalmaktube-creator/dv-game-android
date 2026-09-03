@@ -339,44 +339,143 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             }
 
             val btnR = 92.5.dp.toPx()
+            val buttonCenter = Offset(cx, cy)
+            val shadowSpread = 48.dp.toPx()
+            val shadowRadius = btnR + shadowSpread
+            drawCircle(
+                Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Black.copy(alpha = 0.40f),
+                        (btnR / shadowRadius) to Color.Black.copy(alpha = 0.40f),
+                        1f to Color.Transparent,
+                    ),
+                    center = Offset(cx, cy + 20.dp.toPx()),
+                    radius = shadowRadius,
+                ),
+                shadowRadius,
+                Offset(cx, cy + 20.dp.toPx()),
+            )
+            if (connected) {
+                val connectedGlowR = btnR + 10.dp.toPx()
+                drawCircle(
+                    Brush.radialGradient(
+                        colorStops = arrayOf(
+                            0f to Color(0x1F4EB712),
+                            (btnR / connectedGlowR) to Color(0x1F4EB712),
+                            1f to Color.Transparent,
+                        ),
+                        center = buttonCenter,
+                        radius = connectedGlowR,
+                    ),
+                    connectedGlowR,
+                    buttonCenter,
+                )
+            }
+
+            val direction = Offset(0.573576f * btnR, 0.819152f * btnR)
+            val gradientStart = buttonCenter - direction
+            val gradientEnd = buttonCenter + direction
             val gradColors = listOf(
                 Color(0xFF1A1B20), Color(0xFF191A1F),
                 Color(0xFF18191D), Color(0xFF17181C),
                 Color(0xFF16171B), Color(0xFF15161A),
                 Color(0xFF141519), Color(0xFF131418),
-                Color(0xFF121318)
+                Color(0xFF121318),
             )
             drawCircle(
-                Brush.linearGradient(colors = gradColors, start = Offset(cx - btnR, cy - btnR), end = Offset(cx + btnR, cy + btnR)),
-                btnR, Offset(cx, cy)
+                Brush.linearGradient(colors = gradColors, start = gradientStart, end = gradientEnd),
+                btnR,
+                buttonCenter,
             )
-            drawCircle(Color.White.copy(alpha = 0.0825f), btnR - 0.5.dp.toPx(), Offset(cx, cy - 0.5.dp.toPx()), style = Stroke(1.dp.toPx()))
-            drawCircle(Color.Black.copy(alpha = 0.13f), btnR, Offset(cx, cy + 6.dp.toPx()), style = Stroke(12.dp.toPx()))
+            drawCircle(
+                Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Transparent,
+                        0.52f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.13f),
+                    ),
+                    startY = cy - btnR,
+                    endY = cy + btnR,
+                ),
+                btnR,
+                buttonCenter,
+            )
+            drawCircle(
+                Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0f to Color.White.copy(alpha = 0.0396f),
+                        0.10f to Color.White.copy(alpha = 0.03388f),
+                        0.20f to Color.White.copy(alpha = 0.02816f),
+                        0.31f to Color.White.copy(alpha = 0.02266f),
+                        0.42f to Color.White.copy(alpha = 0.01738f),
+                        0.53f to Color.White.copy(alpha = 0.01254f),
+                        0.63f to Color.White.copy(alpha = 0.00836f),
+                        0.72f to Color.White.copy(alpha = 0.00484f),
+                        0.80f to Color.White.copy(alpha = 0.0022f),
+                        0.88f to Color.Transparent,
+                    ),
+                    start = gradientStart,
+                    end = gradientEnd,
+                ),
+                btnR,
+                buttonCenter,
+            )
+            drawCircle(
+                Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0.52f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.0572f),
+                    ),
+                    start = gradientStart,
+                    end = gradientEnd,
+                ),
+                btnR,
+                buttonCenter,
+            )
+            drawCircle(
+                Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0f to Color.White.copy(alpha = 0.012f),
+                        1f to Color.Transparent,
+                    ),
+                    center = Offset(cx - 26.dp.toPx(), cy - 20.dp.toPx()),
+                    radius = btnR,
+                ),
+                btnR,
+                buttonCenter,
+            )
+            repeat(180) { index ->
+                val angle = Math.toRadians(((index * 137.508f) % 360f).toDouble())
+                val distance = sqrt(((index * 73) % 181) / 181f) * btnR * 0.96f
+                val point = Offset(
+                    cx + cos(angle).toFloat() * distance,
+                    cy + sin(angle).toFloat() * distance,
+                )
+                drawCircle(
+                    if (index % 2 == 0) Color.White.copy(alpha = 0.004f) else Color.Black.copy(alpha = 0.003f),
+                    0.35.dp.toPx(),
+                    point,
+                )
+            }
 
             val borderColor = if (connected) Color(0xFF4EB712) else Color.White.copy(alpha = 0.10f)
-            drawCircle(borderColor, btnR, Offset(cx, cy), style = Stroke(1.dp.toPx()))
-            if (connecting) {
-                drawCircle(
-                    connectTone.copy(alpha = 0.07f + 0.09f * powerPulse),
-                    btnR + (3f + 4f * powerPulse).dp.toPx(), Offset(cx, cy),
-                    style = Stroke((7f + 4f * powerPulse).dp.toPx())
-                )
-            }
-            if (connected) {
-                drawCircle(
-                    Color(0xFF4EB712).copy(alpha = 0.08f + 0.08f * glowPulse),
-                    btnR + (4f + 3f * glowPulse).dp.toPx(), Offset(cx, cy),
-                    style = Stroke((8f + 4f * glowPulse).dp.toPx())
-                )
-            }
+            drawCircle(borderColor, btnR, buttonCenter, style = Stroke(1.dp.toPx()))
+            drawCircle(
+                Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0f to Color.White.copy(alpha = 0.0616f),
+                        0.46f to Color.White.copy(alpha = 0.01078f),
+                        1f to Color.Black.copy(alpha = 0.0784f),
+                    ),
+                    start = gradientStart,
+                    end = gradientEnd,
+                ),
+                btnR - 0.5.dp.toPx(),
+                buttonCenter,
+                style = Stroke(1.dp.toPx()),
+            )
 
-            val iconPulseScale = when {
-                connecting -> 0.94f + 0.12f * powerPulse
-                connected -> 0.985f + 0.03f * powerPulse
-                stopping -> 1f - 0.04f * powerPulse
-                else -> 1f
-            }
-            val iconScale = (74.dp.toPx() / 24f) * iconPulseScale
+            val iconScale = 74.4.dp.toPx() / 24f
             val iconCx = cx
             val iconCy = cy
             val sw = 1.45f * iconScale
