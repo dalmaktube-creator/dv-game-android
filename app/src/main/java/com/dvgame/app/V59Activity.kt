@@ -373,7 +373,7 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             Modifier.size(185.dp).clip(CircleShape)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = click),
             Alignment.Center
-        )
+        ) {}
     }
 }
 
