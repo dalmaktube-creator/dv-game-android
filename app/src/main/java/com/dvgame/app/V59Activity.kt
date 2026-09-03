@@ -618,7 +618,7 @@ private fun DrawerMenuItem(title: String, subtitle: String, iconType: Int, onCli
         }
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(title, color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+            Text(title, color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
             Text(subtitle, color = Color(0xFF65686F), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
         }
     }
@@ -634,7 +634,7 @@ private fun SettingsDetail(ui: AppUiState, m: MainViewModel, install: (UpdateMan
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Auto-launch game", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+                Text("Auto-launch game", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
                 Text("Open the game after boosting", color = Color(0xFF65686F), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
             ToggleSwitch(ui.autoLaunch) { m.setAutoLaunch(it) }
@@ -647,7 +647,7 @@ private fun SettingsDetail(ui: AppUiState, m: MainViewModel, install: (UpdateMan
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Check for updates", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+                Text("Check for updates", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
                 Text(ui.updateStatus, color = Color(0xFF65686F), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
             if (ui.availableUpdate != null) {
@@ -661,7 +661,7 @@ private fun SettingsDetail(ui: AppUiState, m: MainViewModel, install: (UpdateMan
                 .padding(14.dp, 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Reset app data", color = Color(0xFFE07070), style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+            Text("Reset app data", color = Color(0xFFE07070), style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
         }
     }
 }
@@ -676,7 +676,7 @@ private fun AboutDetail() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("DV Game", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+                Text("DV Game", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
                 Text("Connection booster for mobile games", color = Color(0xFF65686F), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
         }
@@ -703,7 +703,7 @@ private fun ContactDetail() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Contact support", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+                Text("Contact support", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
                 Text("Get help with connection or account issues", color = Color(0xFF65686F), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
             Canvas(Modifier.size(16.dp)) {
@@ -721,7 +721,7 @@ private fun ContactDetail() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Send feedback", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+                Text("Send feedback", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
                 Text("Share ideas and report problems", color = Color(0xFF65686F), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
             Canvas(Modifier.size(16.dp)) {
@@ -747,7 +747,7 @@ private fun SubscriptionDetail(ui: AppUiState) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Plan", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.W640))
+                Text("Plan", color = DvColors.Text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
                 Text(account?.name ?: "No active plan", color = Color(0xFF65686F), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp))
             }
             Canvas(Modifier.size(16.dp)) {
