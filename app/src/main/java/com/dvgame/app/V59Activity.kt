@@ -273,11 +273,11 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
         Modifier.fillMaxWidth().height(335.dp),
         Alignment.Center
     ) {
-        Canvas(Modifier.size(300.dp)) {
+        Canvas(Modifier.size(348.dp)) {
             val cx = center.x
             val cy = center.y
-            val trackR = 104.5.dp.toPx()
-            val fieldR = 92.5.dp.toPx()
+            val trackR = 104.4.dp.toPx()
+            val fieldR = 92.4.dp.toPx()
             val tickCount = 140
             val tickPeriod = 360f / tickCount
             val radialScale = sqrt(2f)
@@ -366,7 +366,7 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                 }
             }
 
-            val btnR = 92.5.dp.toPx()
+            val btnR = 92.4.dp.toPx()
             val buttonCenter = Offset(cx, cy)
             val shadowSpread = 48.dp.toPx()
             val shadowRadius = btnR + shadowSpread
@@ -536,7 +536,7 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             drawPowerGlyph(iconColor, sw)
         }
         Box(
-            Modifier.size(185.dp).clip(CircleShape)
+            Modifier.size(184.8.dp).clip(CircleShape)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = click),
             Alignment.Center
         ) {}
