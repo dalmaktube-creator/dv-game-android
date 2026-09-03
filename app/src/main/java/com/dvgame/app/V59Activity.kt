@@ -465,7 +465,7 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                 )
             }
 
-            val borderColor = if (connected) Color(0xFF4EB712) else Color.White.copy(alpha = 0.10f)
+            val borderColor = lerp(Color.White.copy(alpha = 0.10f), Color(0xFF4EB712), borderProgress)
             drawCircle(borderColor, btnR, buttonCenter, style = Stroke(1.dp.toPx()))
             drawCircle(
                 Brush.linearGradient(
