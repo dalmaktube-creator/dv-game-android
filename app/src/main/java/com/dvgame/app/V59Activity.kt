@@ -488,9 +488,8 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             val sw = 1.45f * iconScale
             val cap = StrokeCap.Round
             val iconColor = when {
-                connected -> Color(0xFF4EB712)
                 connecting -> connectTone
-                else -> idleTone
+                else -> lerp(idleTone, Color(0xFF4EB712), connectedToneProgress)
             }
             fun drawPowerGlyph(color: Color, strokeWidth: Float) {
                 drawArc(
@@ -507,9 +506,9 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
                     cap,
                 )
             }
-            if (connected) {
-                val innerGlowAlpha = 0.4032f + 0.0768f * glowPulse
-                val outerGlowAlpha = 0.08f + 0.12f * glowPulse
+            if (connectedToneProgress > 0f) {
+                val innerGlowAlpha = (0.4032f + 0.0768f * glowPulse) * connectedToneProgress
+                val outerGlowAlpha = (0.08f + 0.12f * glowPulse) * connectedToneProgress
                 drawPowerGlyph(iconColor.copy(alpha = outerGlowAlpha), sw + 12.dp.toPx())
                 drawPowerGlyph(iconColor.copy(alpha = innerGlowAlpha), sw + 5.dp.toPx())
             }
