@@ -121,10 +121,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         mutableUi.update { it.copy(message = "اتصال برقرار شد") }
     }
 
-    fun disconnect() = viewModelScope.launch {
-        runCatching { tunnel.disconnect() }
-            .onSuccess { mutableUi.update { it.copy(message = "اتصال قطع شد") } }
-            .onFailure { mutableUi.update { state -> state.copy(message = friendlyError(it)) } }
+    fun disconnect() {
+        viewModelScope.launch {
+            runCatching { tunnel.disconnect() }
+                .onSuccess { mutableUi.update { it.copy(message = "اتصال قطع شد") } }
+                .onFailure { mutableUi.update { state -> state.copy(message = friendlyError(it)) } }
+        }
     }
 
     fun reset() = viewModelScope.launch {
