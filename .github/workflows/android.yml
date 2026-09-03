@@ -102,42 +102,42 @@ jobs:
           set -euo pipefail
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs DV-Game-0.2.0-alpha14-debug.apk | tee apk-signing.txt
+          "$APKSIGNER" verify --verbose --print-certs DV-Game-0.2.0-alpha15-debug.apk | tee apk-signing.txt
           grep -Eqi '^V[0-9.]+ Signer: certificate SHA-256 digest: 3f4a9eeb1bc8a7d6a4eac46ae5bcecd09ad61ec2d64e6363b4cc19aa64a85b1c$' apk-signing.txt
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: dv-game-alpha14-debug-apk
+          name: dv-game-alpha15-debug-apk
           path: |
-            DV-Game-0.2.0-alpha14-debug.apk
-            DV-Game-0.2.0-alpha14-debug.apk.sha256
+            DV-Game-0.2.0-alpha15-debug.apk
+            DV-Game-0.2.0-alpha15-debug.apk.sha256
             dv-game-update.json
             libbox.sha256
             apk-signing.txt
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Alpha 14 release
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_alpha14 == 'true'
+      - name: Publish Alpha 15 release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_alpha15 == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           ASSETS=""
-          for asset in DV-Game-0.2.0-alpha14-debug.apk DV-Game-0.2.0-alpha14-debug.apk.sha256 dv-game-update.json libbox.sha256 apk-signing.txt; do
+          for asset in DV-Game-0.2.0-alpha15-debug.apk DV-Game-0.2.0-alpha15-debug.apk.sha256 dv-game-update.json libbox.sha256 apk-signing.txt; do
             if [ -f "$asset" ]; then
               ASSETS="$ASSETS $asset"
             fi
           done
           test -n "$ASSETS"
-          if gh release view v0.2.0-alpha.14 >/dev/null 2>&1; then
-            gh release upload v0.2.0-alpha.14 $ASSETS --clobber
+          if gh release view v0.2.0-alpha.15 >/dev/null 2>&1; then
+            gh release upload v0.2.0-alpha.15 $ASSETS --clobber
           else
-            gh release create v0.2.0-alpha.14 $ASSETS \
+            gh release create v0.2.0-alpha.15 $ASSETS \
               --target "$GITHUB_SHA" \
-              --title "DV Game 0.2.0 Alpha 14" \
+              --title "DV Game 0.2.0 Alpha 15" \
               --prerelease \
               --notes "پیاده‌سازی بومی کانسپت Minimal Boost با ظاهر تیره، دکمه اتصال و موج‌های انیمیشنی، منوی تنظیمات و انتخاب بازی و سرور؛ همراه با به‌روزرسانی امن درون‌برنامه‌ای."
           fi
