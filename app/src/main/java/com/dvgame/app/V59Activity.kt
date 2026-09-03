@@ -13,6 +13,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -221,16 +223,18 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
         infiniteRepeatable(tween(1080, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "powerPulse"
     )
-    val idleTone by inf.animateColor(
-        Color(0xFF999895), Color(0xFFBAB9B5),
+    val idleToneProgress by inf.animateFloat(
+        0f, 1f,
         infiniteRepeatable(tween(4800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "idleTone"
     )
-    val connectTone by inf.animateColor(
-        Color(0xFFC8C3B0), Color(0xFFF1CC3B),
+    val idleTone = lerp(Color(0xFF999895), Color(0xFFBAB9B5), idleToneProgress)
+    val connectToneProgress by inf.animateFloat(
+        0f, 1f,
         infiniteRepeatable(tween(1080, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "connectTone"
     )
+    val connectTone = lerp(Color(0xFFC8C3B0), Color(0xFFF1CC3B), connectToneProgress)
     val glowPulse by inf.animateFloat(
         0f, 1f,
         infiniteRepeatable(tween(4400, easing = FastOutSlowInEasing, delayMillis = 780), RepeatMode.Reverse),
@@ -308,15 +312,15 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
             }
 
             val btnR = 92.5.dp.toPx()
-            val gradStops = listOf(
-                0.0f to Color(0xFF1A1B20), 0.12f to Color(0xFF191A1F),
-                0.24f to Color(0xFF18191D), 0.37f to Color(0xFF17181C),
-                0.50f to Color(0xFF16171B), 0.63f to Color(0xFF15161A),
-                0.76f to Color(0xFF141519), 0.88f to Color(0xFF131418),
-                1.0f to Color(0xFF121318)
+            val gradColors = listOf(
+                Color(0xFF1A1B20), Color(0xFF191A1F),
+                Color(0xFF18191D), Color(0xFF17181C),
+                Color(0xFF16171B), Color(0xFF15161A),
+                Color(0xFF141519), Color(0xFF131418),
+                Color(0xFF121318)
             )
             drawCircle(
-                Brush.linearGradient(gradStops, start = Offset(cx - btnR, cy - btnR), end = Offset(cx + btnR, cy + btnR)),
+                Brush.linearGradient(colors = gradColors, start = Offset(cx - btnR, cy - btnR), end = Offset(cx + btnR, cy + btnR)),
                 btnR, Offset(cx, cy)
             )
             drawCircle(Color.White.copy(alpha = 0.0825f), btnR - 0.5.dp.toPx(), Offset(cx, cy - 0.5.dp.toPx()), style = Stroke(1.dp.toPx()))
@@ -429,8 +433,8 @@ private fun SelectorRow(label: String, value: String, isGame: Boolean, locked: B
                 } else {
                     drawRoundRect(col, Offset(4f * s, 5f * s), Size(16f * s, 5f * s), CornerRadius(1.5f * s, 1.5f * s))
                     drawRoundRect(col, Offset(4f * s, 14f * s), Size(16f * s, 5f * s), CornerRadius(1.5f * s, 1.5f * s))
-                    drawCircle(col, Offset(8f * s, 7.5f * s), 0.6f * s)
-                    drawCircle(col, Offset(8f * s, 16.5f * s), 0.6f * s)
+                    drawCircle(col, 0.6f * s, Offset(8f * s, 7.5f * s))
+                    drawCircle(col, 0.6f * s, Offset(8f * s, 16.5f * s))
                     drawLine(col, Offset(12f * s, 7.5f * s), Offset(17f * s, 7.5f * s), 1f * s, StrokeCap.Round)
                     drawLine(col, Offset(12f * s, 16.5f * s), Offset(17f * s, 16.5f * s), 1f * s, StrokeCap.Round)
                 }
@@ -452,7 +456,7 @@ private fun SelectorRow(label: String, value: String, isGame: Boolean, locked: B
                 color = DvColors.Text,
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.W620,
+                    fontWeight = FontWeight.SemiBold,
                 ),
             )
         }
