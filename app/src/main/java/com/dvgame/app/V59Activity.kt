@@ -246,6 +246,13 @@ private fun ControlStage(state: TunnelStatus, click: () -> Unit) {
         ),
         label = "glowPulse"
     )
+    val cssEase = CubicBezierEasing(0.25f, 0.10f, 0.25f, 1f)
+    val exitEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+    val trackAlpha by animateFloatAsState(if (idle) 0.52f else 0f, tween(600, easing = cssEase), label = "trackAlpha")
+    val linkFieldAlpha by animateFloatAsState(if (connecting) 1f else 0f, tween(if (connecting) 500 else 620, easing = if (connecting) cssEase else exitEase), label = "linkFieldAlpha")
+    val greenFieldAlpha by animateFloatAsState(if (connected) 1f else 0f, tween(if (connected) 500 else 620, easing = if (connected) cssEase else exitEase), label = "greenFieldAlpha")
+    val connectedToneProgress by animateFloatAsState(if (connected) 1f else 0f, tween(if (connected) 780 else 500, easing = if (connected) exitEase else cssEase), label = "connectedTone")
+    val borderProgress by animateFloatAsState(if (connected) 1f else 0f, tween(1100, easing = cssEase), label = "borderProgress")
 
     Box(
         Modifier.fillMaxWidth().height(335.dp),
