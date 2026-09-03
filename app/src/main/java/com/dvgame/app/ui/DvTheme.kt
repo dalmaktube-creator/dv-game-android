@@ -20,18 +20,18 @@ object DvColors {
     val PrimaryLight = Color(0xFFDDD6FE)
     val AccentPink = Color(0xFFE879F9)
     val Amber = Color(0xFFFBBF24)
-    val Background = Color(0xFF0D0A1A)
-    val BackgroundDeep = Color(0xFF080614)
-    val Surface = Color(0xFF171130)
-    val SurfaceHigh = Color(0xFF241C4A)
-    val CardBorder = Color(0x38A78BFA)
-    val Divider = Color(0xFF2C2350)
-    val WarmBorder = Color(0xFF3B2D66)
-    val Glow = Color(0x59A78BFA)
+    val Background = Color(0xFF0B0C0E)
+    val BackgroundDeep = Color(0xFF090A0C)
+    val Surface = Color(0xFF121316)
+    val SurfaceHigh = Color(0xFF17181C)
+    val CardBorder = Color(0x16FFFFFF)
+    val Divider = Color(0x16FFFFFF)
+    val WarmBorder = Color(0xFFD8C8A6)
+    val Glow = Color(0x29777A80)
     val Success = Color(0xFF34D399)
     val Danger = Color(0xFFF87171)
-    val Text = Color(0xFFF5F3FF)
-    val Muted = Color(0xFF9D97B8)
+    val Text = Color(0xFFF2F1ED)
+    val Muted = Color(0xFF777A80)
 
     val ActiveButton = Brush.linearGradient(
         0f to Color(0xFF7C3AED),
@@ -39,9 +39,9 @@ object DvColors {
         1f to Color(0xFFC084FC),
     )
     val ScreenBackground = Brush.verticalGradient(
-        0f to Color(0xFF17102E),
-        0.45f to Color(0xFF0D0A1A),
-        1f to Color(0xFF080614),
+        0f to Color(0xFF0D0E11),
+        0.70f to Color(0xFF090A0C),
+        1f to Color(0xFF090A0C),
     )
 }
 
