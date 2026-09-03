@@ -8,6 +8,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 object DvColors {
+    val Green = Color(0xFF4EB712)
+    val GreenDeep = Color(0xFF10230D)
+    val Panel = Color(0xFF121316)
+    val Drawer = Color(0xFF101114)
+    val Line = Color(0x16FFFFFF)
+    val MutedDark = Color(0xFF676A71)
     val Primary = Color(0xFFA78BFA)
     val PrimaryDeep = Color(0xFF7C3AED)
     val PrimaryDark = Color(0xFF4C1D95)
